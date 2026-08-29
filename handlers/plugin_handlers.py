@@ -185,14 +185,15 @@ def register_plugin_handlers(bot, pending_submissions):
     def handle_plugin_submission(message: types.Message):
         is_private = message.chat.type == "private"
         is_group = message.chat.id == GROUP_ID
+        is_updates = message.chat.id == UPDATES_CHAT_ID
 
-        if is_group:
+        if is_group or is_updates:
             return
 
         if not is_private:
             bot.reply_to(
                 message,
-                "❌ Отправь плагин мне в личные сообщения (@KangelPluginsBot)"
+                "❌ Отправь плагин мне в личные сообщения (@KPMAppealBot)"
             )
             return
 

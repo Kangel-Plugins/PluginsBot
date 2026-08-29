@@ -2,7 +2,7 @@ import re
 import html
 from telebot import types
 
-from PluginsBot.config import GROUP_ID
+from PluginsBot.config import GROUP_ID, UPDATES_CHAT_ID
 
 
 CATEGORIES = {
@@ -40,13 +40,6 @@ def register_command_handlers(bot, pending_submissions):
                 "• __version__ = \"1.0.0\"\n"
                 "• __author__ = \"@username\"\n\n"
                 "Зависимости детектируются автоматически по импортам.",
-            )
-        else:
-            bot.reply_to(
-                message,
-                "✅ Бот работает!\n\n"
-                "Используй меня в личных сообщениях для отправки плагинов.\n"
-                "В этой группе я показываю заявки на добавление плагинов."
             )
 
     @bot.message_handler(commands=["status"])
