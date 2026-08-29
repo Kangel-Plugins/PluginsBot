@@ -186,7 +186,10 @@ def register_plugin_handlers(bot, pending_submissions):
         is_private = message.chat.type == "private"
         is_group = message.chat.id == GROUP_ID
 
-        if not is_private and not is_group:
+        if is_group:
+            return
+
+        if not is_private:
             bot.reply_to(
                 message,
                 "❌ Отправь плагин мне в личные сообщения (@KangelPluginsBot)"

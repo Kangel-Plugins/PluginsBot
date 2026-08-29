@@ -1,6 +1,3 @@
-"""
-Обработчики одобрения/отклонения плагинов
-"""
 import html
 import json
 import os
