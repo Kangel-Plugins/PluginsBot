@@ -70,13 +70,23 @@ def _move_old_version_to_legacy(plugin_id: str, old_filename: str) -> bool:
         if not os.path.exists(dst):
             shutil.copy2(old_path, dst)
 
+        legacy_signature = None
+        if _private_key:
+            try:
+                legacy_signature = sign_plugin(_private_key, plugin_id, version, dst)
+            except Exception:
+                pass
+
         if "legacy_version" not in entry:
             entry["legacy_version"] = {}
 
-        entry["legacy_version"][version] = {
+        legacy_entry = {
             "url": f"https://raw.githubusercontent.com/Kangel-Plugins/Plugins-Store/main/legacy_versions/{plugin_id}/{archive_name}",
             "hash": file_hash
         }
+        if legacy_signature:
+            legacy_entry["signature"] = legacy_signature
+        entry["legacy_version"][version] = legacy_entry
 
         with open(STORE_JSON_FILE, "w", encoding="utf-8") as f:
             json.dump(store_data, f, indent=4, ensure_ascii=False)
@@ -137,8 +147,17 @@ def register_approval_handlers(bot, pending_submissions):
 
             url = f"https://raw.githubusercontent.com/Kangel-Plugins/Plugins-Store/main/Plugins/{plugin_filename}"
 
+            version = metadata.get('version', '1.0.0')
+            signature = None
+            if _private_key:
+                try:
+                    signature = sign_plugin(_private_key, plugin_id, version, plugin_path)
+                    print(f"✅ Подписан {plugin_id} v{version}: {signature[:32]}...")
+                except Exception as e:
+                    print(f"⚠️ Ошибка подписи {plugin_id}: {e}")
+
             status = submission.get("status", "plugin")
-            if not add_plugin_to_store_json(plugin_id, url, dependencies, plugin_filename, status=status):
+            if not add_plugin_to_store_json(plugin_id, url, dependencies, plugin_filename, status=status, signature=signature):
                 error_msg = f"❌ Ошибка при добавлении {plugin_id} в store.json (смотри консоль)"
                 print(f"[APPROVE] {error_msg}")
                 bot.answer_callback_query(call.id, error_msg, show_alert=True)
@@ -146,7 +165,6 @@ def register_approval_handlers(bot, pending_submissions):
 
             action_text = "добавлен" if is_new_plugin else "обновлен"
 
-            version = metadata.get('version', '1.0.0')
             success, commit_message = commit_and_push(plugin_id, version, is_new_plugin)
 
             if not success:
