@@ -6,15 +6,24 @@ import shutil
 import hashlib
 from telebot import types
 
-from PluginsBot.config import GROUP_ID, PLUGINS_DIR, REPO_PATH, KNOWN_LIBS, STORE_JSON_FILE
+from PluginsBot.config import GROUP_ID, PLUGINS_DIR, REPO_PATH, KNOWN_LIBS, STORE_JSON_FILE, PRIVATE_KEY_PATH
 from PluginsBot.utils.store_utils import add_plugin_to_store_json, get_plugin_filename_by_id
 from PluginsBot.utils.git_utils import commit_and_push
 from PluginsBot.utils.notification_utils import send_plugin_update_notification
+from PluginsBot.utils.crypto_utils import load_private_key, sign_plugin
 
 
 LEGACY_DIR = os.path.join(REPO_PATH, "legacy_versions")
 
 pending_rejections = {}
+
+_private_key = None
+try:
+    if os.path.exists(PRIVATE_KEY_PATH):
+        _private_key = load_private_key(PRIVATE_KEY_PATH)
+        print(f"✅ Загружен приватный ключ: {PRIVATE_KEY_PATH}")
+except Exception as e:
+    print(f"⚠️ Ошибка загрузки приватного ключа: {e}")
 
 
 def _move_old_version_to_legacy(plugin_id: str, old_filename: str) -> bool:
