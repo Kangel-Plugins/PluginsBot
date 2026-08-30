@@ -74,7 +74,7 @@ def _move_old_version_to_legacy(plugin_id: str, old_filename: str) -> bool:
             entry["legacy_version"] = {}
 
         entry["legacy_version"][version] = {
-            "url": f"https://raw.githubusercontent.com/KangelPlugins/Plugins-Store/main/legacy_versions/{plugin_id}/{archive_name}",
+            "url": f"https://raw.githubusercontent.com/Kangel-Plugins/Plugins-Store/main/legacy_versions/{plugin_id}/{archive_name}",
             "hash": file_hash
         }
 
@@ -135,7 +135,7 @@ def register_approval_handlers(bot, pending_submissions):
                 with open(plugin_path, "w", encoding="utf-8") as f:
                     f.write(submission["plugin_content"])
 
-            url = f"https://raw.githubusercontent.com/KangelPlugins/Plugins-Store/main/Plugins/{plugin_filename}"
+            url = f"https://raw.githubusercontent.com/Kangel-Plugins/Plugins-Store/main/Plugins/{plugin_filename}"
 
             status = submission.get("status", "plugin")
             if not add_plugin_to_store_json(plugin_id, url, dependencies, plugin_filename, status=status):

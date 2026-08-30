@@ -1,6 +1,6 @@
 # PluginsBot
 
-Telegram-бот для управления репозиторием на базе [KPM Store](https://github.com/KangelPlugins/Plugins-Store) 
+Telegram-бот для управления репозиторием на базе [KPM Store](https://github.com/Kangel-Plugins/Plugins-Store) 
 
 
 ## Требования
