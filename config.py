@@ -77,3 +77,5 @@ KNOWN_LIBS = {
     "cactuslib": "cactuslib",
     "dont65_lib": "dont65_lib",
 }
+
+PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH", os.path.join(REPO_PATH, "private_key.pem"))
