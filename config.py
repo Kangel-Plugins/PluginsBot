@@ -1,6 +1,8 @@
 import os
+import sys
 from pathlib import Path
 
+IS_DEMO = "--demo" in sys.argv or os.getenv("BOT_DEMO", "").lower() in ("1", "true", "yes")
 
 try:
     from dotenv import load_dotenv
@@ -24,7 +26,6 @@ if not BOT_TOKEN:
 GROUP_ID = int(os.getenv("GROUP_ID", "-1003243078083"))
 UPDATES_CHAT_ID = int(os.getenv("UPDATES_CHAT_ID", "-1002977846884"))
 UPDATES_TOPIC_ID = int(os.getenv("UPDATES_TOPIC_ID", "1270"))
-
 
 STORE_RAW_URL = os.getenv(
     "STORE_RAW_URL",
@@ -61,13 +62,13 @@ REPO_PATH = str(REPO_PATH_OBJ)
 PLUGINS_DIR = str(REPO_PATH_OBJ / "Plugins")
 STORE_JSON_FILE = str(REPO_PATH_OBJ / "store.json")
 
-if not os.path.exists(REPO_PATH):
+if not os.path.exists(REPO_PATH) and not IS_DEMO:
     raise ValueError(
         f"❌ Репозиторий не найден: {REPO_PATH}\n"
         f"   Установите переменную окружения PLUGINS_STORE_PATH или разместите\n"
         f"   Plugins-Store рядом с PluginsBot или в родительских директориях."
     )
-if not os.path.exists(PLUGINS_DIR):
+if not os.path.exists(PLUGINS_DIR) and not IS_DEMO:
     raise ValueError(f"❌ Папка плагинов не найдена: {PLUGINS_DIR}")
 
 if os.getenv("BOT_DEBUG"):
