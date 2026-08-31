@@ -6,7 +6,7 @@ import shutil
 import hashlib
 from telebot import types
 
-from PluginsBot.config import GROUP_ID, PLUGINS_DIR, REPO_PATH, KNOWN_LIBS, STORE_JSON_FILE, PRIVATE_KEY_PATH
+from PluginsBot.config import GROUP_ID, PLUGINS_DIR, REPO_PATH, KNOWN_LIBS, STORE_JSON_FILE, PRIVATE_KEY_PATH, STORE_RAW_URL
 from PluginsBot.utils.store_utils import add_plugin_to_store_json, get_plugin_filename_by_id
 from PluginsBot.utils.git_utils import commit_and_push
 from PluginsBot.utils.notification_utils import send_plugin_update_notification
@@ -90,7 +90,7 @@ def _move_old_version_to_legacy(plugin_id: str, old_filename: str) -> bool:
             entry["legacy_version"] = {}
 
         legacy_entry = {
-            "url": f"https://raw.githubusercontent.com/Kangel-Plugins/Plugins-Store/main/legacy_versions/{plugin_id}/{archive_name}",
+            "url": f"{STORE_RAW_URL}/legacy_versions/{plugin_id}/{archive_name}",
             "hash": file_hash
         }
         if legacy_signature:
@@ -154,7 +154,7 @@ def register_approval_handlers(bot, pending_submissions):
                 with open(plugin_path, "w", encoding="utf-8") as f:
                     f.write(submission["plugin_content"])
 
-            url = f"https://raw.githubusercontent.com/Kangel-Plugins/Plugins-Store/main/Plugins/{plugin_filename}"
+            url = f"{STORE_RAW_URL}/Plugins/{plugin_filename}"
 
             version = metadata.get('version', '1.0.0')
             signature = None

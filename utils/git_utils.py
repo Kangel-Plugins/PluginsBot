@@ -20,10 +20,14 @@ def ensure_ssh_remote():
             print(f"✅ SSH remote уже настроен: {current_url}")
             return
 
-        if "github.com" in current_url:
-            if "github.com/" in current_url:
-                repo_path = current_url.split("github.com/")[1].replace(".git", "")
-                ssh_url = f"git@github.com:{repo_path}.git"
+        if current_url.startswith("https://") or current_url.startswith("http://"):
+            _, rest = current_url.split("://", 1)
+            if "/" in rest:
+                host, path = rest.split("/", 1)
+                path = path.rstrip("/")
+                if path.endswith(".git"):
+                    path = path[:-4]
+                ssh_url = f"git@{host}:{path}.git"
 
                 print(f"🔄 Переключаю remote с HTTPS на SSH...")
                 subprocess.run(
@@ -145,10 +149,17 @@ def commit_and_push(plugin_id: str, version: str, is_new: bool):
             print(f"   stderr: {push_result.stderr}")
 
             if "Permission denied" in push_result.stderr or "Authentication failed" in push_result.stderr:
+                origin_url = _git_get(REPO_PATH, ["remote", "get-url", "origin"])
+                host = origin_url
+                if "://" in host:
+                    host = host.split("://", 1)[1].split("/", 1)[0]
+                elif host.startswith("git@"):
+                    host = host.split("@", 1)[1].split(":", 1)[0]
+
                 print(f"\n💡 Подсказка: Убедитесь, что:")
-                print(f"   1. SSH ключ добавлен в ssh-agent: ssh-add ~/.ssh/id_rsa")
-                print(f"   2. SSH ключ добавлен в GitHub: https://github.com/settings/keys")
-                print(f"   3. Проверьте подключение: ssh -T git@github.com")
+                print(f"   1. SSH ключ добавлен в ssh-agent: ssh-add ~/.ssh/id_ed25519")
+                print(f"   2. SSH ключ добавлен в ваш git-сервер (Forgejo/Gitea): {host}")
+                print(f"   3. Проверьте подключение: ssh -T git@{host}")
 
             raise Exception(f"Git push failed: {push_result.stderr}")
 

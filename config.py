@@ -26,7 +26,10 @@ UPDATES_CHAT_ID = int(os.getenv("UPDATES_CHAT_ID", "-1002977846884"))
 UPDATES_TOPIC_ID = int(os.getenv("UPDATES_TOPIC_ID", "1270"))
 
 
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+STORE_RAW_URL = os.getenv(
+    "STORE_RAW_URL",
+    "https://git.kangel.xyz/KangelPlugins/Plugins-Store/raw/branch/main",
+)
 
 def find_plugins_store() -> Path:
     env_path = os.getenv("PLUGINS_STORE_PATH")
