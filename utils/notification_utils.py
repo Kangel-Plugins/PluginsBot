@@ -1,43 +1,54 @@
-
 import html
 from telebot import types
 
 from PluginsBot.config import UPDATES_CHAT_ID, UPDATES_TOPIC_ID
+from PluginsBot.utils.emoji_utils import (
+    make_inline_button,
+    ID_DOWNLOAD,
+    ID_REFRESH,
+    EMOJI_PLUS,
+    EMOJI_REFRESH,
+    EMOJI_PACKAGE,
+    EMOJI_MEMO,
+    EMOJI_DEVELOPER,
+    EMOJI_PIN,
+    EMOJI_FOLDER,
+    EMOJI_TRASH,
+    EMOJI_MESSAGES,
+    EMOJI_USER,
+)
 
 
 def send_plugin_update_notification(bot, plugin_id, plugin_name, author, version, is_new, status="plugin"):
     try:
-        action = "➕ Новый плагин" if is_new else "🔄 Обновление плагина"
+        action = f"{EMOJI_PLUS} <b>Новый плагин</b>" if is_new else f"{EMOJI_REFRESH} <b>Обновление плагина</b>"
 
-        status_labels = {
-            "library": "Библиотека",
-            "customization": "Кастомизация",
-            "utilities": "Утилиты",
-            "informational": "Информация",
-            "fun": "Развлечения",
-            "messages": "Сообщения",
-            "plugin": "Плагин"
-        }
-        type_label = status_labels.get(status.lower(), "Плагин") if status else "Плагин"
+        from PluginsBot.handlers.command_handlers import get_category_label
+        type_label = get_category_label(status.lower()) if status else "Плагин"
 
         notification_text = (
             f"{action}\n\n"
-            f"📦 <b>ID:</b> <code>{html.escape(str(plugin_id))}</code>\n"
-            f"📝 <b>Название:</b> {html.escape(str(plugin_name))}\n"
-            f"👨‍💻 <b>Автор:</b> {html.escape(str(author))}\n"
-            f"📌 <b>Версия:</b> {html.escape(str(version))}\n"
-            f"📂 <b>Тип:</b> {html.escape(str(type_label))}"
+            f"{EMOJI_PACKAGE} <b>ID:</b> <code>{html.escape(str(plugin_id))}</code>\n"
+            f"{EMOJI_MEMO} <b>Название:</b> {html.escape(str(plugin_name))}\n"
+            f"{EMOJI_DEVELOPER} <b>Автор:</b> {html.escape(str(author))}\n"
+            f"{EMOJI_PIN} <b>Версия:</b> {html.escape(str(version))}\n"
+            f"{EMOJI_FOLDER} <b>Тип:</b> {type_label}"
         )
 
         keyboard = types.InlineKeyboardMarkup(row_width=2)
         keyboard.add(
-            types.InlineKeyboardButton(
-                "⬇️ Установить",
-                url=f"tg://kpm_install?plugin={html.escape(str(plugin_id))}"
+            make_inline_button(
+                "Установить",
+                url=f"tg://kpm_install?plugin={html.escape(str(plugin_id))}",
+                emoji_id=ID_DOWNLOAD,
+                fallback_emoji="⬇️",
+                style="primary",
             ),
-            types.InlineKeyboardButton(
-                "🔄 Обновить список",
-                url="tg://kpm_list"
+            make_inline_button(
+                "Обновить список",
+                url="tg://kpm_list",
+                emoji_id=ID_REFRESH,
+                fallback_emoji="🔄",
             ),
         )
 
@@ -57,7 +68,7 @@ def send_plugin_update_notification(bot, plugin_id, plugin_name, author, version
                 reply_markup=keyboard,
             )
 
-        print(f"✅ Уведомление об обновлении плагина {plugin_id} отправлено")
+        print(f"✅ Уведомление об обновлении плагина {plugin_id} отправлено в топик")
         return True
 
     except Exception as e:
@@ -70,10 +81,10 @@ def send_plugin_delete_notification(bot, plugin_id, reason, admin_user):
         admin_name = admin_user.username or str(admin_user.id)
 
         notification_text = (
-            f"🗑 <b>Плагин удалён</b>\n\n"
-            f"📦 <b>ID:</b> <code>{html.escape(str(plugin_id))}</code>\n"
-            f"💬 <b>Причина:</b> {html.escape(reason)}\n"
-            f"👤 <b>Удалил:</b> @{html.escape(admin_name)}"
+            f"{EMOJI_TRASH} <b>Плагин удалён</b>\n\n"
+            f"{EMOJI_PACKAGE} <b>ID:</b> <code>{html.escape(str(plugin_id))}</code>\n"
+            f"{EMOJI_MESSAGES} <b>Причина:</b> {html.escape(reason)}\n"
+            f"{EMOJI_USER} <b>Удалил:</b> @{html.escape(admin_name)}"
         )
 
         if UPDATES_TOPIC_ID:

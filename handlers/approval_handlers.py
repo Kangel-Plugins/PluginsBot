@@ -11,6 +11,29 @@ from PluginsBot.utils.store_utils import add_plugin_to_store_json, get_plugin_fi
 from PluginsBot.utils.git_utils import commit_and_push
 from PluginsBot.utils.notification_utils import send_plugin_update_notification
 from PluginsBot.utils.crypto_utils import load_private_key, sign_plugin
+from PluginsBot.handlers.command_handlers import get_category_label
+from PluginsBot.utils.emoji_utils import (
+    make_inline_button,
+    check_and_update_from_message,
+    ID_CROSS,
+    ID_BACK,
+    EMOJI_CROSS,
+    EMOJI_CHECK,
+    EMOJI_PACKAGE,
+    EMOJI_MEMO,
+    EMOJI_USER,
+    EMOJI_MESSAGES_TEXT,
+    EMOJI_CLIPBOARD,
+    EMOJI_DEVELOPER,
+    EMOJI_PIN,
+    EMOJI_MOBILE,
+    EMOJI_MOBILE_ARROW,
+    EMOJI_FOLDER,
+    EMOJI_CHART_TEXT,
+    EMOJI_FILE,
+    EMOJI_LIBRARY_TEXT,
+    EMOJI_LINK,
+)
 
 
 LEGACY_DIR = os.path.join(REPO_PATH, "legacy_versions")
@@ -156,17 +179,8 @@ def register_approval_handlers(bot, pending_submissions):
 
             url = f"{STORE_RAW_URL}/Plugins/{plugin_filename}"
 
-            version = metadata.get('version', '1.0.0')
-            signature = None
-            if _private_key:
-                try:
-                    signature = sign_plugin(_private_key, plugin_id, version, plugin_path)
-                    print(f"✅ Подписан {plugin_id} v{version}: {signature[:32]}...")
-                except Exception as e:
-                    print(f"⚠️ Ошибка подписи {plugin_id}: {e}")
-
             status = submission.get("status", "plugin")
-            if not add_plugin_to_store_json(plugin_id, url, dependencies, plugin_filename, status=status, signature=signature):
+            if not add_plugin_to_store_json(plugin_id, url, dependencies, plugin_filename, status=status):
                 error_msg = f"❌ Ошибка при добавлении {plugin_id} в store.json (смотри консоль)"
                 print(f"[APPROVE] {error_msg}")
                 bot.answer_callback_query(call.id, error_msg, show_alert=True)
@@ -174,6 +188,7 @@ def register_approval_handlers(bot, pending_submissions):
 
             action_text = "добавлен" if is_new_plugin else "обновлен"
 
+            version = metadata.get('version', '1.0.0')
             success, commit_message = commit_and_push(plugin_id, version, is_new_plugin)
 
             if not success:
@@ -183,9 +198,9 @@ def register_approval_handlers(bot, pending_submissions):
 
             try:
                 bot.delete_message(call.message.chat.id, call.message.message_id)
-                print(f"✅ Сообщение о заявке удалено из группы")
+                print(f"✅ Сообщение о заявке удалено")
             except Exception as delete_error:
-                print(f"⚠️ Не удалось удалить сообщение из группы: {delete_error}")
+                print(f"⚠️ Не удалось удалить сообщение: {delete_error}")
 
             status = submission.get("status", "plugin")
             send_plugin_update_notification(
@@ -200,13 +215,14 @@ def register_approval_handlers(bot, pending_submissions):
 
             if commit_message:
                 try:
-                    bot.send_message(
+                    sent = bot.send_message(
                         submission["user_id"],
-                        f"✅ <b>Плагин одобрен!</b>\n\n"
+                        f"{EMOJI_CHECK} <b>Плагин одобрен!</b>\n\n"
                         f"Ваш плагин <code>{html.escape(str(plugin_id))}</code> успешно {action_text} в хранилище.\n"
                         f"Коммит: {html.escape(str(commit_message))}",
                         parse_mode="HTML",
                     )
+                    check_and_update_from_message(sent)
                     print(f"✅ Уведомление об одобрении отправлено пользователю {submission['user_id']}")
                 except Exception as notify_error:
                     print(f"⚠️ Не удалось отправить уведомление пользователю {submission['user_id']}: {notify_error}")
@@ -240,16 +256,27 @@ def register_approval_handlers(bot, pending_submissions):
 
         keyboard = types.InlineKeyboardMarkup(row_width=2)
         keyboard.add(
-            types.InlineKeyboardButton("❌ Да, отклонить", callback_data=f"rejc_{submission_id}"),
-            types.InlineKeyboardButton("◀️ Назад", callback_data=f"rejx_{submission_id}"),
+            make_inline_button(
+                "Да, отклонить",
+                callback_data=f"rejc_{submission_id}",
+                emoji_id=ID_CROSS,
+                fallback_emoji="❌",
+                style="danger",
+            ),
+            make_inline_button(
+                "Назад",
+                callback_data=f"rejx_{submission_id}",
+                emoji_id=ID_BACK,
+                fallback_emoji="◀️",
+            ),
         )
 
         bot.edit_message_caption(
             caption=(
-                f"❌ <b>Отклонение плагина</b>\n\n"
-                f"📦 ID: <code>{html.escape(str(plugin_id))}</code>\n"
-                f"📝 Название: {html.escape(str(plugin_name))}\n"
-                f"👤 Автор: @{html.escape(str(username))}\n\n"
+                f"{EMOJI_CROSS} <b>Отклонение плагина</b>\n\n"
+                f"{EMOJI_PACKAGE} ID: <code>{html.escape(str(plugin_id))}</code>\n"
+                f"{EMOJI_MEMO} Название: {html.escape(str(plugin_name))}\n"
+                f"{EMOJI_USER} Автор: @{html.escape(str(username))}\n\n"
                 f"Введите причину отказа следующим сообщением в чат.\n"
                 f"Или нажмите «Да, отклонить» для отклонения без причины."
             ),
@@ -339,7 +366,7 @@ def register_approval_handlers(bot, pending_submissions):
         group_message_id = pending.get("group_message_id")
 
         if submission_id not in pending_submissions:
-            bot.reply_to(message, "❌ Заявка уже обработана")
+            bot.reply_to(message, f"{EMOJI_CROSS} Заявка уже обработана", parse_mode="HTML")
             return
 
         reason = message.text.strip() or "Причина не указана"
@@ -371,26 +398,28 @@ def _execute_rejection(bot, pending_submissions, submission_id, reason, submissi
         pass
 
     try:
-        bot.send_message(
+        sent = bot.send_message(
             submission["user_id"],
-            f"❌ <b>Плагин отклонён</b>\n\n"
-            f"📦 ID: <code>{html.escape(str(plugin_id))}</code>\n"
-            f"💬 Причина: {html.escape(reason)}\n"
-            f"👤 Отклонил: @{html.escape(admin_name)}\n\n"
+            f"{EMOJI_CROSS} <b>Плагин отклонён</b>\n\n"
+            f"{EMOJI_PACKAGE} ID: <code>{html.escape(str(plugin_id))}</code>\n"
+            f"{EMOJI_MESSAGES_TEXT} Причина: {html.escape(reason)}\n"
+            f"{EMOJI_USER} Отклонил: @{html.escape(admin_name)}\n\n"
             f"Если у вас есть вопросы, обратитесь к администраторам.",
             parse_mode="HTML",
         )
+        check_and_update_from_message(sent)
     except Exception as e:
         print(f"⚠️ Не удалось отправить уведомление пользователю {submission['user_id']}: {e}")
 
     try:
-        bot.send_message(
+        sent2 = bot.send_message(
             trigger_message.chat.id,
-            f"❌ <b>Отклонено</b>: <code>{html.escape(str(plugin_id))}</code>\n"
-            f"💬 Причина: {html.escape(reason)}\n"
-            f"👤 Отклонил: @{html.escape(admin_name)}",
+            f"{EMOJI_CROSS} <b>Отклонено</b>: <code>{html.escape(str(plugin_id))}</code>\n"
+            f"{EMOJI_MESSAGES_TEXT} Причина: {html.escape(reason)}\n"
+            f"{EMOJI_USER} Отклонил: @{html.escape(admin_name)}",
             parse_mode="HTML",
         )
+        check_and_update_from_message(sent2)
     except Exception:
         pass
 
@@ -400,55 +429,53 @@ def _execute_rejection(bot, pending_submissions, submission_id, reason, submissi
 def _build_submission_caption(metadata, submission, pending_submissions=None):
     exists = submission.get("status") is not None
     info_text = (
-        f"📋 <b>{'Обновление' if exists else 'Новая заявка'} на плагин</b>\n\n"
-        f"👤 От: @{submission.get('username', 'Unknown')}\n"
-        f"📦 ID: <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
-        f"📝 Название: {html.escape(str(metadata.get('name', 'N/A')))}\n"
-        f"👨‍💻 Автор: {html.escape(str(metadata.get('author', 'N/A')))}\n"
-        f"📌 Версия: {html.escape(str(metadata.get('version', 'N/A')))}\n"
+        f"{EMOJI_CLIPBOARD} <b>{'Обновление' if exists else 'Новая заявка'} на плагин</b>\n\n"
+        f"{EMOJI_USER} От: @{submission.get('username', 'Unknown')}\n"
+        f"{EMOJI_PACKAGE} ID: <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
+        f"{EMOJI_MEMO} Название: {html.escape(str(metadata.get('name', 'N/A')))}\n"
+        f"{EMOJI_DEVELOPER} Автор: {html.escape(str(metadata.get('author', 'N/A')))}\n"
+        f"{EMOJI_PIN} Версия: {html.escape(str(metadata.get('version', 'N/A')))}\n"
     )
 
     min_version = metadata.get('min_version')
     if min_version:
-        info_text += f"📱 Min version: {html.escape(str(min_version))}\n"
+        info_text += f"{EMOJI_MOBILE} Min version: {html.escape(str(min_version))}\n"
 
     app_version = metadata.get('app_version')
     if app_version and app_version != min_version:
-        info_text += f"📲 App version: {html.escape(str(app_version))}\n"
+        info_text += f"{EMOJI_MOBILE_ARROW} App version: {html.escape(str(app_version))}\n"
 
     if submission.get("status"):
-        from .command_handlers import CATEGORIES
-        label = CATEGORIES.get(submission["status"], submission["status"])
-        info_text += f"📂 Категория: <b>{html.escape(label)}</b>\n"
+        info_text += f"{EMOJI_FOLDER} Категория: <b>{get_category_label(submission['status'])}</b>\n"
 
     if exists:
-        info_text += f"📊 Текущий статус: <b>{html.escape(str(submission.get('status')))}</b>\n"
+        info_text += f"{EMOJI_CHART_TEXT} Текущий статус: <b>{html.escape(str(submission.get('status')))}</b>\n"
 
     description = metadata.get('description')
     if description:
         desc_preview = description[:200] + "..." if len(description) > 200 else description
-        info_text += f"📄 Описание: {html.escape(desc_preview)}\n"
+        info_text += f"{EMOJI_FILE} Описание: {html.escape(desc_preview)}\n"
 
     requirements = metadata.get('requirements')
     if requirements:
         safe_reqs = [html.escape(str(r)) for r in requirements]
-        info_text += f"📦 Requirements: {', '.join(safe_reqs)}\n"
+        info_text += f"{EMOJI_PACKAGE} Requirements: {', '.join(safe_reqs)}\n"
 
     dependencies = submission.get("dependencies", [])
     if dependencies:
         safe_deps = [html.escape(str(d)) for d in dependencies]
-        info_text += f"📚 Зависимости: {', '.join(safe_deps)}\n"
+        info_text += f"{EMOJI_LIBRARY_TEXT} Зависимости: {', '.join(safe_deps)}\n"
 
     requires = metadata.get('requires')
     if requires:
         req_texts = []
         for r in requires:
-            label = str(r.get('id', '?'))
+            rlabel = str(r.get('id', '?'))
             ver = r.get('min_version')
             if ver:
-                label += f" ({html.escape(str(ver))})"
-            req_texts.append(html.escape(label))
-        info_text += f"🔗 Требует: {', '.join(req_texts)}\n"
+                rlabel += f" ({html.escape(str(ver))})"
+            req_texts.append(html.escape(rlabel))
+        info_text += f"{EMOJI_LINK} Требует: {', '.join(req_texts)}\n"
 
-    info_text += f"\n📄 Файл: <code>{html.escape(submission.get('plugin_file', 'N/A'))}</code>"
+    info_text += f"\n{EMOJI_FILE} Файл: <code>{html.escape(submission.get('plugin_file', 'N/A'))}</code>"
     return info_text

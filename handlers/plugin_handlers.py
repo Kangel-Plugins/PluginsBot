@@ -1,4 +1,3 @@
-
 import os
 import re
 import tempfile
@@ -6,9 +5,30 @@ import html
 from telebot import types
 
 from PluginsBot.config import GROUP_ID, PLUGINS_DIR, UPDATES_CHAT_ID
-from PluginsBot.handlers.command_handlers import CATEGORIES, category_keyboard
+from PluginsBot.handlers.command_handlers import CATEGORIES, get_category_label, get_category_name, category_keyboard
 from PluginsBot.utils.plugin_utils import extract_plugin_metadata, detect_dependencies, extract_elyx_metadata, is_elyx_plugin
 from PluginsBot.utils.store_utils import is_plugin_in_store
+from PluginsBot.utils.emoji_utils import (
+    make_inline_button,
+    check_and_update_from_message,
+    ID_CHECK,
+    ID_CROSS,
+    EMOJI_CROSS,
+    EMOJI_CHECK,
+    EMOJI_CLIPBOARD,
+    EMOJI_USER,
+    EMOJI_PACKAGE,
+    EMOJI_MEMO,
+    EMOJI_DEVELOPER,
+    EMOJI_PIN,
+    EMOJI_MOBILE,
+    EMOJI_MOBILE_ARROW,
+    EMOJI_FOLDER,
+    EMOJI_CHART_TEXT,
+    EMOJI_FILE,
+    EMOJI_LIBRARY_TEXT,
+    EMOJI_LINK,
+)
 
 
 pending_file_data = {}
@@ -18,14 +38,31 @@ def create_approval_keyboard(submission_id: int, needs_status: bool = False) -> 
     keyboard = types.InlineKeyboardMarkup(row_width=2)
 
     keyboard.row(
-        types.InlineKeyboardButton("✅ Принять", callback_data=f"approve_{submission_id}"),
-        types.InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_{submission_id}"),
+        make_inline_button(
+            "Принять",
+            callback_data=f"approve_{submission_id}",
+            emoji_id=ID_CHECK,
+            fallback_emoji="✅",
+            style="success",
+        ),
+        make_inline_button(
+            "Отклонить",
+            callback_data=f"reject_{submission_id}",
+            emoji_id=ID_CROSS,
+            fallback_emoji="❌",
+            style="danger",
+        ),
     )
 
     if needs_status:
         buttons = [
-            types.InlineKeyboardButton(label, callback_data=f"status_{key}_{submission_id}")
-            for key, label in CATEGORIES.items()
+            make_inline_button(
+                text=name,
+                callback_data=f"status_{key}_{submission_id}",
+                emoji_id=emoji_id,
+                fallback_emoji=fallback,
+            )
+            for key, (name, fallback, emoji_id) in CATEGORIES.items()
         ]
         keyboard.add(*buttons)
 
@@ -44,43 +81,42 @@ def _send_to_group(bot, pending_submissions, user_id):
     pending_submissions[submission_id] = data
 
     info_text = (
-        f"📋 <b>{'Обновление' if data.get('exists') else 'Новая заявка'} на плагин</b>\n\n"
-        f"👤 От: @{data.get('username', 'Unknown')}\n"
-        f"📦 ID: <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
-        f"📝 Название: {html.escape(str(metadata.get('name', 'N/A')))}\n"
-        f"👨‍💻 Автор: {html.escape(str(metadata.get('author', 'N/A')))}\n"
-        f"📌 Версия: {html.escape(str(metadata.get('version', 'N/A')))}\n"
+        f"{EMOJI_CLIPBOARD} <b>{'Обновление' if data.get('exists') else 'Новая заявка'} на плагин</b>\n\n"
+        f"{EMOJI_USER} От: @{data.get('username', 'Unknown')}\n"
+        f"{EMOJI_PACKAGE} ID: <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
+        f"{EMOJI_MEMO} Название: {html.escape(str(metadata.get('name', 'N/A')))}\n"
+        f"{EMOJI_DEVELOPER} Автор: {html.escape(str(metadata.get('author', 'N/A')))}\n"
+        f"{EMOJI_PIN} Версия: {html.escape(str(metadata.get('version', 'N/A')))}\n"
     )
 
     min_version = metadata.get('min_version')
     if min_version:
-        info_text += f"📱 Min version: {html.escape(str(min_version))}\n"
+        info_text += f"{EMOJI_MOBILE} Min version: {html.escape(str(min_version))}\n"
 
     app_version = metadata.get('app_version')
     if app_version and app_version != min_version:
-        info_text += f"📲 App version: {html.escape(str(app_version))}\n"
+        info_text += f"{EMOJI_MOBILE_ARROW} App version: {html.escape(str(app_version))}\n"
 
     if category:
-        label = CATEGORIES.get(category, category)
-        info_text += f"📂 Категория: <b>{html.escape(label)}</b>\n"
+        info_text += f"{EMOJI_FOLDER} Категория: <b>{get_category_label(category)}</b>\n"
 
     if data.get('exists'):
-        info_text += f"📊 Текущий статус: <b>{html.escape(str(category))}</b>\n"
+        info_text += f"{EMOJI_CHART_TEXT} Текущий статус: <b>{html.escape(str(category))}</b>\n"
 
     description = metadata.get('description')
     if description:
         desc_preview = description[:200] + "..." if len(description) > 200 else description
-        info_text += f"📄 Описание: {html.escape(desc_preview)}\n"
+        info_text += f"{EMOJI_FILE} Описание: {html.escape(desc_preview)}\n"
 
     requirements = metadata.get('requirements')
     if requirements:
         safe_reqs = [html.escape(str(r)) for r in requirements]
-        info_text += f"📦 Requirements: {', '.join(safe_reqs)}\n"
+        info_text += f"{EMOJI_PACKAGE} Requirements: {', '.join(safe_reqs)}\n"
 
     dependencies = data.get("dependencies", [])
     if dependencies:
         safe_deps = [html.escape(str(d)) for d in dependencies]
-        info_text += f"📚 Зависимости: {', '.join(safe_deps)}\n"
+        info_text += f"{EMOJI_LIBRARY_TEXT} Зависимости: {', '.join(safe_deps)}\n"
 
     requires = metadata.get('requires')
     if requires:
@@ -91,9 +127,9 @@ def _send_to_group(bot, pending_submissions, user_id):
             if ver:
                 rlabel += f" ({html.escape(str(ver))})"
             req_texts.append(html.escape(rlabel))
-        info_text += f"🔗 Требует: {', '.join(req_texts)}\n"
+        info_text += f"{EMOJI_LINK} Требует: {', '.join(req_texts)}\n"
 
-    info_text += f"\n📄 Файл: <code>{html.escape(data.get('plugin_file', 'N/A'))}</code>"
+    info_text += f"\n{EMOJI_FILE} Файл: <code>{html.escape(data.get('plugin_file', 'N/A'))}</code>"
 
     is_elyx = data.get("is_elyx", False)
     plugin_content = data["plugin_content"]
@@ -115,6 +151,7 @@ def _send_to_group(bot, pending_submissions, user_id):
                 parse_mode="HTML",
                 reply_markup=create_approval_keyboard(submission_id, needs_status=not data.get('exists')),
             )
+            check_and_update_from_message(group_message)
             pending_submissions[submission_id]["group_message_id"] = group_message.message_id
     finally:
         if os.path.exists(tmp_path):
@@ -134,14 +171,13 @@ def register_plugin_handlers(bot, pending_submissions):
             return
 
         pending_submissions[submission_id]["status"] = new_status
-        metadata = pending_submissions[submission_id]["metadata"]
         caption = call.message.caption or ""
 
-        status_pattern = re.compile(r"\n?📊 Выбранный статус: <b>.*?</b>")
+        status_pattern = re.compile(r"\n?(?:<tg-emoji[^>]*>)?📊(?:</tg-emoji>)? Выбранный статус: <b>.*?</b>")
         caption = status_pattern.sub("", caption)
 
-        label = CATEGORIES.get(new_status, new_status)
-        info_text = html.escape(caption) + f"\n📊 Выбранный статус: <b>{html.escape(label)}</b>"
+        cat_lbl = get_category_label(new_status)
+        info_text = caption + f"\n{EMOJI_CHART_TEXT} Выбранный статус: <b>{cat_lbl}</b>"
 
         bot.edit_message_caption(
             caption=info_text,
@@ -150,7 +186,7 @@ def register_plugin_handlers(bot, pending_submissions):
             parse_mode="HTML",
             reply_markup=create_approval_keyboard(submission_id, needs_status=False)
         )
-        bot.answer_callback_query(call.id, f"✅ Статус: {label}")
+        bot.answer_callback_query(call.id, f"✅ Статус: {get_category_name(new_status)}")
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("cat_"))
     def handle_category_selection(call: types.CallbackQuery):
@@ -164,10 +200,10 @@ def register_plugin_handlers(bot, pending_submissions):
 
         _send_to_group(bot, pending_submissions, user_id)
 
-        label = CATEGORIES.get(category, category)
+        msg_text = f"{EMOJI_CHECK} Категория: <b>{get_category_label(category)}</b>\n\nЗаявка отправлена в группу на рассмотрение."
         try:
             bot.edit_message_text(
-                f"✅ Категория: <b>{label}</b>\n\nЗаявка отправлена в группу на рассмотрение.",
+                msg_text,
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
                 parse_mode="HTML",
@@ -175,7 +211,7 @@ def register_plugin_handlers(bot, pending_submissions):
         except Exception:
             bot.send_message(
                 call.message.chat.id,
-                f"✅ Категория: <b>{label}</b>\n\nЗаявка отправлена в группу на рассмотрение.",
+                msg_text,
                 parse_mode="HTML",
             )
 
@@ -193,7 +229,8 @@ def register_plugin_handlers(bot, pending_submissions):
         if not is_private:
             bot.reply_to(
                 message,
-                "❌ Отправь плагин мне в личные сообщения (@KPMAppealBot)"
+                f"{EMOJI_CROSS} Отправь плагин мне в личные сообщения (@KPMAppealBot)",
+                parse_mode="HTML"
             )
             return
 
@@ -203,20 +240,22 @@ def register_plugin_handlers(bot, pending_submissions):
                 if chat_member.status in ("left", "kicked", "restricted"):
                     bot.reply_to(
                         message,
-                        "❌ Для отправки плагинов необходимо зайти в @KangelPluginsManager",
+                        f"{EMOJI_CROSS} Для отправки плагинов необходимо зайти в @KangelPluginsManager",
+                        parse_mode="HTML"
                     )
                     return
             except Exception as e:
                 print(f"⚠️ Ошибка при проверке членства в чате: {e}")
                 bot.reply_to(
                     message,
-                    "❌ Для отправки плагинов необходимо зайти в @KangelPluginsManager",
+                    f"{EMOJI_CROSS} Для отправки плагинов необходимо зайти в @KangelPluginsManager",
+                    parse_mode="HTML"
                 )
                 return
 
         filename = message.document.file_name.lower()
         if not (filename.endswith(".plugin") or filename.endswith(".zip") or filename.endswith(".elyx") or filename.endswith(".eaf")):
-            bot.reply_to(message, "❌ Отправь файл с расширением .plugin, .eaf, .elyx или .zip")
+            bot.reply_to(message, f"{EMOJI_CROSS} Отправь файл с расширением .plugin, .eaf, .elyx или .zip", parse_mode="HTML")
             return
 
         try:
@@ -237,7 +276,7 @@ def register_plugin_handlers(bot, pending_submissions):
                 dependencies = detect_dependencies(plugin_content)
 
             if not metadata.get("id"):
-                bot.reply_to(message, "❌ Не найден id в плагине")
+                bot.reply_to(message, f"{EMOJI_CROSS} Не найден id в плагине", parse_mode="HTML")
                 return
 
             exists, current_status = is_plugin_in_store(metadata.get("id"))
@@ -257,20 +296,19 @@ def register_plugin_handlers(bot, pending_submissions):
 
             if exists and current_status:
                 _send_to_group(bot, pending_submissions, message.from_user.id)
-                label = CATEGORIES.get(current_status, current_status)
                 bot.reply_to(
                     message,
-                    f"✅ Плагин обновлён! Категория: <b>{html.escape(label)}</b>\n"
+                    f"{EMOJI_CHECK} Плагин обновлён! Категория: <b>{get_category_label(current_status)}</b>\n"
                     f"Заявка отправлена в группу на рассмотрение.",
                     parse_mode="HTML",
                 )
             else:
                 bot.reply_to(
                     message,
-                    f"📦 Плагин: <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
-                    f"📝 Название: {html.escape(str(metadata.get('name', 'N/A')))}\n"
-                    f"👨‍💻 Автор: {html.escape(str(metadata.get('author', 'N/A')))}\n"
-                    f"📌 Версия: {html.escape(str(metadata.get('version', 'N/A')))}\n\n"
+                    f"{EMOJI_PACKAGE} <b>Плагин:</b> <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
+                    f"{EMOJI_MEMO} <b>Название:</b> {html.escape(str(metadata.get('name', 'N/A')))}\n"
+                    f"{EMOJI_DEVELOPER} <b>Автор:</b> {html.escape(str(metadata.get('author', 'N/A')))}\n"
+                    f"{EMOJI_PIN} <b>Версия:</b> {html.escape(str(metadata.get('version', 'N/A')))}\n\n"
                     f"Выбери категорию плагина:",
                     parse_mode="HTML",
                     reply_markup=category_keyboard(),
@@ -278,4 +316,4 @@ def register_plugin_handlers(bot, pending_submissions):
 
         except Exception as e:
             print(f"Ошибка при обработке плагина: {e}")
-            bot.reply_to(message, f"❌ Ошибка при обработке файла: {str(e)}")
+            bot.reply_to(message, f"{EMOJI_CROSS} Ошибка при обработке файла: {html.escape(str(e))}", parse_mode="HTML")
