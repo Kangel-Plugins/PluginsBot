@@ -186,6 +186,20 @@ def register_approval_handlers(bot, pending_submissions):
                 bot.answer_callback_query(call.id, error_msg, show_alert=True)
                 return
 
+            if _private_key and os.path.exists(plugin_path):
+                try:
+                    version = metadata.get('version', '1.0.0')
+                    sig = sign_plugin(_private_key, plugin_id, version, plugin_path)
+                    with open(STORE_JSON_FILE, "r", encoding="utf-8") as f:
+                        store_data = json.load(f)
+                    if plugin_id in store_data:
+                        store_data[plugin_id]["signature"] = sig
+                        with open(STORE_JSON_FILE, "w", encoding="utf-8") as f:
+                            json.dump(store_data, f, indent=4, ensure_ascii=False)
+                        print(f"✅ Подпись добавлена для {plugin_id} v{version}")
+                except Exception as e:
+                    print(f"⚠️ Ошибка подписи {plugin_id}: {e}")
+
             action_text = "добавлен" if is_new_plugin else "обновлен"
 
             version = metadata.get('version', '1.0.0')
