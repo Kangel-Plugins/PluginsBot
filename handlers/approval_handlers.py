@@ -300,24 +300,32 @@ def register_approval_handlers(bot, pending_submissions):
             reply_markup=keyboard,
         )
 
-        pending_rejections[call.message.chat.id] = {
+        pending_rejections[submission_id] = {
             "submission_id": submission_id,
             "group_message_id": call.message.message_id,
+            "chat_id": call.message.chat.id,
             "awaiting_reason": True,
-            "admin_user": call.from_user,
         }
 
         bot.answer_callback_query(call.id, "Введите причину отказа или подтвердите")
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("rejc_"))
     def handle_reject_confirm(call: types.CallbackQuery):
-        chat_id = call.message.chat.id
-        if chat_id not in pending_rejections:
+        try:
+            submission_id = int(call.data.split("_")[1])
+        except (IndexError, ValueError):
             bot.answer_callback_query(call.id, "❌ Заявка не найдена", show_alert=True)
             return
 
-        pending = pending_rejections.pop(chat_id)
-        submission_id = pending["submission_id"]
+        pending = pending_rejections.pop(submission_id, None)
+        if pending is None:
+            legacy = pending_rejections.get(call.message.chat.id)
+            if legacy is None or legacy.get("submission_id") != submission_id:
+                bot.answer_callback_query(call.id, "❌ Заявка не найдена", show_alert=True)
+                return
+            pending = pending_rejections.pop(call.message.chat.id, None)
+
+        chat_id = pending.get("chat_id", call.message.chat.id)
         group_message_id = pending.get("group_message_id")
 
         if submission_id not in pending_submissions:
@@ -331,14 +339,19 @@ def register_approval_handlers(bot, pending_submissions):
                 pass
 
         submission = pending_submissions[submission_id]
-        admin_user = pending.get("admin_user", call.from_user)
+        admin_user = call.from_user
         _execute_rejection(bot, pending_submissions, submission_id, "Причина не указана", submission, call.message, admin_user)
         bot.answer_callback_query(call.id, "✅ Плагин отклонён")
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("rejx_"))
     def handle_reject_cancel(call: types.CallbackQuery):
-        chat_id = call.message.chat.id
-        pending_rejections.pop(chat_id, None)
+        try:
+            submission_id_cancel = int(call.data.split("_")[1])
+        except (IndexError, ValueError):
+            submission_id_cancel = None
+        if submission_id_cancel is not None:
+            pending_rejections.pop(submission_id_cancel, None)
+        pending_rejections.pop(call.message.chat.id, None)
 
         submission_id = int(call.data.split("_")[1])
         if submission_id not in pending_submissions:
@@ -362,21 +375,64 @@ def register_approval_handlers(bot, pending_submissions):
         )
         bot.answer_callback_query(call.id, "Отменено")
 
-    @bot.message_handler(
-        func=lambda m: (
-            m.chat.id in pending_rejections
-            and pending_rejections[m.chat.id].get("awaiting_reason")
-            and m.text
-            and not m.text.startswith("/")
-        ),
-    )
+    def _has_pending_rejection(msg):
+        if not msg.text or msg.text.startswith("/"):
+            return False
+        for p in pending_rejections.values():
+            if p.get("chat_id") == msg.chat.id and p.get("awaiting_reason"):
+                return True
+        if msg.chat.id in pending_rejections and isinstance(pending_rejections[msg.chat.id], dict) and pending_rejections[msg.chat.id].get("awaiting_reason"):
+            return True
+        return False
+
+    @bot.message_handler(func=_has_pending_rejection)
     def handle_reject_reason_text(message: types.Message):
         chat_id = message.chat.id
-        if chat_id not in pending_rejections:
+        candidates = [p for p in pending_rejections.values() if p.get("chat_id") == chat_id and p.get("awaiting_reason")]
+        if not candidates and chat_id in pending_rejections and isinstance(pending_rejections[chat_id], dict):
+            pending = pending_rejections.pop(chat_id)
+            submission_id = pending.get("submission_id")
+            group_message_id = pending.get("group_message_id")
+            if submission_id not in pending_submissions:
+                bot.reply_to(message, f"{EMOJI_CROSS} Заявка уже обработана", parse_mode="HTML")
+                return
+            reason = message.text.strip() or "Причина не указана"
+            submission = pending_submissions[submission_id]
+            admin_user = message.from_user
+            try:
+                bot.delete_message(chat_id, message.message_id)
+            except Exception:
+                pass
+            if group_message_id:
+                try:
+                    bot.delete_message(chat_id, group_message_id)
+                except Exception:
+                    pass
+            _execute_rejection(bot, pending_submissions, submission_id, reason, submission, message, admin_user)
             return
 
-        pending = pending_rejections.pop(chat_id)
+        if not candidates:
+            return
+        pending = None
+        reply_id = getattr(getattr(message, "reply_to_message", None), "message_id", None)
+        if reply_id is not None:
+            for c in candidates:
+                if c.get("group_message_id") == reply_id:
+                    pending = c
+                    break
+
+        if pending is None:
+            if len(candidates) == 1:
+                pending = candidates[0]
+            else:
+                pending = sorted(candidates, key=lambda x: x.get("group_message_id", 0))[-1]
+                try:
+                    bot.send_message(chat_id, "⚠️ Несколько плагинов ждут причину. Причина применена к последнему отклонению. Для точности отвечайте (reply) на сообщение с отклонением.")
+                except Exception:
+                    pass
+
         submission_id = pending["submission_id"]
+        pending_rejections.pop(submission_id, None)
         group_message_id = pending.get("group_message_id")
 
         if submission_id not in pending_submissions:
@@ -385,7 +441,7 @@ def register_approval_handlers(bot, pending_submissions):
 
         reason = message.text.strip() or "Причина не указана"
         submission = pending_submissions[submission_id]
-        admin_user = pending.get("admin_user", message.from_user)
+        admin_user = message.from_user
 
         try:
             bot.delete_message(chat_id, message.message_id)
@@ -404,7 +460,47 @@ def register_approval_handlers(bot, pending_submissions):
 def _execute_rejection(bot, pending_submissions, submission_id, reason, submission, trigger_message, admin_user):
     plugin_id = submission["metadata"].get("id")
     username = submission.get("username", "Unknown")
-    admin_name = admin_user.username or str(admin_user.id)
+    if getattr(admin_user, "username", None):
+        admin_display = f"@{admin_user.username}"
+    else:
+        first = getattr(admin_user, "first_name", "") or ""
+        last = getattr(admin_user, "last_name", "") or ""
+        full = f"{first} {last}".strip()
+        admin_display = html.escape(full) if full else f"ID {admin_user.id}"
+        admin_display_escaped = admin_display if full else html.escape(admin_display)
+        admin_name = None
+        admin_name_raw = admin_display
+        try:
+            bot.delete_message(trigger_message.chat.id, trigger_message.message_id)
+        except Exception:
+            pass
+        try:
+            sent = bot.send_message(
+                submission["user_id"],
+                f"{EMOJI_CROSS} <b>Плагин отклонён</b>\n\n"
+                f"{EMOJI_PACKAGE} ID: <code>{html.escape(str(plugin_id))}</code>\n"
+                f"{EMOJI_MESSAGES_TEXT} Причина: {html.escape(reason)}\n"
+                f"{EMOJI_USER} Отклонил: {html.escape(admin_display) if admin_display.startswith('@') else admin_display}\n\n"
+                f"Если у вас есть вопросы, обратитесь к администраторам.",
+                parse_mode="HTML",
+            )
+            check_and_update_from_message(sent)
+        except Exception as e:
+            print(f"⚠️ Не удалось отправить уведомление пользователю {submission['user_id']}: {e}")
+        try:
+            sent2 = bot.send_message(
+                trigger_message.chat.id,
+                f"{EMOJI_CROSS} <b>Отклонено</b>: <code>{html.escape(str(plugin_id))}</code>\n"
+                f"{EMOJI_MESSAGES_TEXT} Причина: {html.escape(reason)}\n"
+                f"{EMOJI_USER} Отклонил: {html.escape(admin_display) if admin_display.startswith('@') else admin_display}",
+                parse_mode="HTML",
+            )
+            check_and_update_from_message(sent2)
+        except Exception:
+            pass
+        del pending_submissions[submission_id]
+        return
+    admin_name = admin_user.username
 
     try:
         bot.delete_message(trigger_message.chat.id, trigger_message.message_id)
