@@ -1,4 +1,3 @@
-import os
 import math
 import asyncio
 import logging
@@ -51,8 +50,6 @@ def format_size(bytes_num: int) -> str:
         return f"{bytes_num / 1024:.1f} КБ"
     return f"{bytes_num} Б"
 
-
-# --- Fast Background MTProto Bot Client Management ---
 
 _mtproto_loop: Optional[asyncio.AbstractEventLoop] = None
 _mtproto_thread: Optional[threading.Thread] = None
@@ -123,7 +120,7 @@ async def _fast_download_document(client, doc, max_workers: int = 8) -> bytes:
     from telethon.tl.types import InputDocumentFileLocation
 
     file_size = doc.size
-    part_size = 512 * 1024 
+    part_size = 512 * 1024
     total_parts = math.ceil(file_size / part_size)
 
     location = InputDocumentFileLocation(
@@ -132,6 +129,20 @@ async def _fast_download_document(client, doc, max_workers: int = 8) -> bytes:
         file_reference=doc.file_reference,
         thumb_size="",
     )
+
+    dc_id = getattr(doc, "dc_id", None) or client.session.dc_id
+    sender = None
+    if dc_id != client.session.dc_id:
+        try:
+            sender = await client._borrow_exported_sender(dc_id)
+        except Exception as e:
+            logger.debug(f"Could not borrow sender for DC {dc_id}: {e}")
+            sender = None
+
+    async def _send_req(req):
+        if sender:
+            return await sender.send(req)
+        return await client(req)
 
     parts = [None] * total_parts
     semaphore = asyncio.Semaphore(max_workers)
@@ -142,7 +153,7 @@ async def _fast_download_document(client, doc, max_workers: int = 8) -> bytes:
         async with semaphore:
             for attempt in range(3):
                 try:
-                    res = await client(GetFileRequest(
+                    res = await _send_req(GetFileRequest(
                         location=location,
                         offset=offset,
                         limit=limit,
@@ -154,9 +165,23 @@ async def _fast_download_document(client, doc, max_workers: int = 8) -> bytes:
                         raise
                     await asyncio.sleep(0.3)
 
-    tasks = [_fetch_part(i) for i in range(total_parts)]
-    await asyncio.gather(*tasks)
-    return b"".join(parts)
+    try:
+        tasks = [_fetch_part(i) for i in range(total_parts)]
+        await asyncio.gather(*tasks)
+        return b"".join(parts)
+    finally:
+        if sender:
+            try:
+                await client._return_exported_sender(sender)
+            except Exception:
+                pass
+
+
+async def _stream_download_document(client, doc) -> bytes:
+    chunks = []
+    async for chunk in client.iter_download(doc, request_size=512 * 1024):
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 async def _async_download_large_file(bot, file_id: str, max_size: int = ELYX_LIMIT) -> bytes:
@@ -193,13 +218,25 @@ async def _async_download_large_file(bot, file_id: str, max_size: int = ELYX_LIM
         if source.document.size > max_size:
             raise ValueError(f"Размер файла превышает лимит ({format_size(max_size)})")
 
+        data = None
         try:
             data = await asyncio.wait_for(
                 _fast_download_document(client, source.document, max_workers=8),
-                timeout=180,
+                timeout=120,
             )
         except Exception as exc:
-            logger.warning(f"Fast parallel download failed ({exc}), falling back to standard download...")
+            logger.debug(f"Fast parallel download skipped ({exc}), trying 512KB stream...")
+
+        if not data:
+            try:
+                data = await asyncio.wait_for(
+                    _stream_download_document(client, source.document),
+                    timeout=180,
+                )
+            except Exception as exc:
+                logger.debug(f"Stream download failed ({exc}), falling back to standard download_media...")
+
+        if not data:
             data = await asyncio.wait_for(
                 client.download_media(source, file=bytes),
                 timeout=300,
@@ -218,7 +255,6 @@ async def _async_download_large_file(bot, file_id: str, max_size: int = ELYX_LIM
 
 
 def download_plugin_file(bot, document) -> bytes:
-
     file_name = document.file_name or "plugin.plugin"
     file_size = getattr(document, "file_size", 0) or 0
     max_limit = plugin_file_limit(file_name)
@@ -228,6 +264,7 @@ def download_plugin_file(bot, document) -> bytes:
             f"Размер файла ({format_size(file_size)}) превышает лимит: "
             f"{'8 МБ для .plugin' if not is_elyx_plugin(file_name) else '100 МБ для Elyx (.elyx/.eaf/.zip)'}"
         )
+
     if file_size and file_size <= BOT_DOWNLOAD_BYTES:
         try:
             file_info = bot.get_file(document.file_id)
@@ -238,7 +275,6 @@ def download_plugin_file(bot, document) -> bytes:
                 if not (API_ID and API_HASH):
                     raise
             logger.warning(f"Bot API download failed ({exc}), falling back to fast MTProto...")
-
 
     if not (API_ID and API_HASH):
         raise ValueError(

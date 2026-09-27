@@ -89,6 +89,6 @@ API_HASH = os.getenv("API_HASH") or os.getenv("TELEGRAM_API_HASH") or ""
 FILE_TRANSFER_CHAT_ID = int(os.getenv("FILE_TRANSFER_CHAT_ID") or os.getenv("TRANSFER_CHAT_ID") or str(GROUP_ID))
 BOT_SESSIONS_DIR = os.getenv("BOT_SESSIONS_DIR", str(Path(__file__).parent / "data" / "bot_sessions"))
 
-PLUGIN_LIMIT = 8 * 1024 * 1024        # 8 MB max for .plugin
-ELYX_LIMIT = 100 * 1024 * 1024       # 100 MB max for Elyx (.elyx, .eaf, .zip)
-BOT_DOWNLOAD_BYTES = 20 * 1024 * 1024  # 20 MB Bot API download limit
+PLUGIN_LIMIT = 8 * 1024 * 1024
+ELYX_LIMIT = 100 * 1024 * 1024
+BOT_DOWNLOAD_BYTES = 20 * 1024 * 1024
