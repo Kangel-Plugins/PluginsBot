@@ -6,7 +6,14 @@ from telebot import types
 
 from PluginsBot.config import GROUP_ID, PLUGINS_DIR, UPDATES_CHAT_ID
 from PluginsBot.handlers.command_handlers import CATEGORIES, get_category_label, get_category_name, category_keyboard
-from PluginsBot.utils.plugin_utils import extract_plugin_metadata, detect_dependencies, extract_elyx_metadata, is_elyx_plugin
+from PluginsBot.utils.plugin_utils import extract_plugin_metadata, detect_dependencies, extract_elyx_metadata
+from PluginsBot.utils.download_utils import (
+    download_plugin_file,
+    is_elyx_plugin,
+    plugin_extension,
+    plugin_file_limit,
+    format_size,
+)
 from PluginsBot.utils.store_utils import is_plugin_in_store
 from PluginsBot.utils.emoji_utils import (
     make_inline_button,
@@ -133,29 +140,47 @@ def _send_to_group(bot, pending_submissions, user_id):
 
     is_elyx = data.get("is_elyx", False)
     plugin_content = data["plugin_content"]
-    tmp_suffix = ".eaf" if is_elyx else ".plugin"
-    tmp_file = tempfile.NamedTemporaryFile(suffix=tmp_suffix, delete=False, mode="wb")
-    if isinstance(plugin_content, str):
-        tmp_file.write(plugin_content.encode("utf-8"))
-    else:
-        tmp_file.write(plugin_content)
-    tmp_file.close()
-    tmp_path = tmp_file.name
+    file_id = data.get("file_id")
 
-    try:
-        with open(tmp_path, "rb") as plugin_file:
+    group_message = None
+    if file_id:
+        try:
             group_message = bot.send_document(
                 GROUP_ID,
-                plugin_file,
+                file_id,
                 caption=info_text,
                 parse_mode="HTML",
                 reply_markup=create_approval_keyboard(submission_id, needs_status=not data.get('exists')),
             )
-            check_and_update_from_message(group_message)
-            pending_submissions[submission_id]["group_message_id"] = group_message.message_id
-    finally:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+        except Exception as e:
+            print(f"⚠️ Не удалось отправить документ по file_id, пробуем через файл: {e}")
+            group_message = None
+
+    if not group_message:
+        tmp_suffix = ".eaf" if is_elyx else ".plugin"
+        tmp_file = tempfile.NamedTemporaryFile(suffix=tmp_suffix, delete=False, mode="wb")
+        if isinstance(plugin_content, str):
+            tmp_file.write(plugin_content.encode("utf-8"))
+        else:
+            tmp_file.write(plugin_content)
+        tmp_file.close()
+        tmp_path = tmp_file.name
+
+        try:
+            with open(tmp_path, "rb") as plugin_file:
+                group_message = bot.send_document(
+                    GROUP_ID,
+                    plugin_file,
+                    caption=info_text,
+                    parse_mode="HTML",
+                    reply_markup=create_approval_keyboard(submission_id, needs_status=not data.get('exists')),
+                )
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+    check_and_update_from_message(group_message)
+    pending_submissions[submission_id]["group_message_id"] = group_message.message_id
 
 
 def register_plugin_handlers(bot, pending_submissions):
@@ -253,16 +278,23 @@ def register_plugin_handlers(bot, pending_submissions):
                 )
                 return
 
-        filename = message.document.file_name.lower()
-        if not (filename.endswith(".plugin") or filename.endswith(".zip") or filename.endswith(".elyx") or filename.endswith(".eaf")):
-            bot.reply_to(message, f"{EMOJI_CROSS} Отправь файл с расширением .plugin, .eaf, .elyx или .zip", parse_mode="HTML")
+        filename = message.document.file_name or ""
+        ext = plugin_extension(filename)
+        if not ext:
+            bot.reply_to(
+                message,
+                f"{EMOJI_CROSS} Отправь файл плагина (.plugin, .eaf, .elyx, .zip, .eaf.zip, .elyx.zip)\n\n"
+                f"<b>Лимиты размера:</b>\n"
+                f"• .plugin — до 8 МБ\n"
+                f"• Elyx (.eaf / .elyx / .zip) — до 100 МБ",
+                parse_mode="HTML"
+            )
             return
 
         try:
-            file_info = bot.get_file(message.document.file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
+            downloaded_file = download_plugin_file(bot, message.document)
 
-            is_elyx = is_elyx_plugin(message.document.file_name)
+            is_elyx = is_elyx_plugin(filename)
             if not is_elyx and downloaded_file[:4] == b'PK\x03\x04':
                 is_elyx = True
 
@@ -286,6 +318,8 @@ def register_plugin_handlers(bot, pending_submissions):
                 "username": message.from_user.username or "Unknown",
                 "plugin_content": plugin_content,
                 "plugin_file": message.document.file_name,
+                "file_id": message.document.file_id,
+                "file_size": getattr(message.document, "file_size", 0),
                 "is_elyx": is_elyx,
                 "metadata": metadata,
                 "dependencies": dependencies,

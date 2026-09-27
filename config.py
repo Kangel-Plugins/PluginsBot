@@ -83,3 +83,12 @@ KNOWN_LIBS = {
 }
 
 PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH", os.path.join(REPO_PATH, "private_key.pem"))
+
+API_ID = int(os.getenv("API_ID") or os.getenv("TELEGRAM_API_ID") or "0")
+API_HASH = os.getenv("API_HASH") or os.getenv("TELEGRAM_API_HASH") or ""
+FILE_TRANSFER_CHAT_ID = int(os.getenv("FILE_TRANSFER_CHAT_ID") or os.getenv("TRANSFER_CHAT_ID") or str(GROUP_ID))
+BOT_SESSIONS_DIR = os.getenv("BOT_SESSIONS_DIR", str(Path(__file__).parent / "data" / "bot_sessions"))
+
+PLUGIN_LIMIT = 8 * 1024 * 1024        # 8 MB max for .plugin
+ELYX_LIMIT = 100 * 1024 * 1024       # 100 MB max for Elyx (.elyx, .eaf, .zip)
+BOT_DOWNLOAD_BYTES = 20 * 1024 * 1024  # 20 MB Bot API download limit
