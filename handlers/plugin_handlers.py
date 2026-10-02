@@ -305,7 +305,7 @@ def register_plugin_handlers(bot, pending_submissions):
             else:
                 plugin_content = downloaded_file.decode("utf-8", errors="ignore")
                 metadata = extract_plugin_metadata(plugin_content)
-                dependencies = detect_dependencies(plugin_content)
+                dependencies = detect_dependencies(plugin_content, metadata.get("id"))
 
             if not metadata.get("id"):
                 bot.reply_to(message, f"{EMOJI_CROSS} Не найден id в плагине", parse_mode="HTML")

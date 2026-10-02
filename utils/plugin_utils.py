@@ -60,7 +60,7 @@ def extract_plugin_metadata(plugin_content: str) -> Dict[str, Any]:
     return metadata
 
 
-def detect_dependencies(plugin_content: str) -> List[str]:
+def detect_dependencies(plugin_content: str, plugin_id: str = None) -> List[str]:
 
     dependencies = []
 
@@ -73,6 +73,8 @@ def detect_dependencies(plugin_content: str) -> List[str]:
         matches = re.findall(pattern, plugin_content)
         for match in matches:
             if match in KNOWN_LIBS:
+                if match == plugin_id:
+                    continue
                 if match not in dependencies:
                     dependencies.append(match)
 
