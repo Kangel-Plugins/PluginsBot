@@ -1,13 +1,13 @@
 # PluginsBot
 
-Telegram-бот для управления репозиторием на базе [KPM Store](https://github.com/Kangel-Plugins/Plugins-Store) 
+Telegram-бот для управления репозиторием на базе [KPM Store](https://git.kangel.xyz/KangelPlugins/Plugins-Store) 
 
 
 ## Требования
 
 - Python 3.10+
 - Git с SSH-доступом к репозиторию магазина
-- SSH-ключ, добавленный в аккаунт GitHub (бот пушит через SSH)
+- SSH-ключ, добавленный в Gitea (бот пушит через SSH)
 - Токен Telegram-бота
 - Telegram-группа с топиками (форум) для отправки плагинов
 - Telegram-канал/топик для уведомлений об обновлениях
@@ -17,7 +17,7 @@ Telegram-бот для управления репозиторием на баз
 Бот пушит коммиты через SSH. Убедись, что:
 
 1. У тебя есть пара SSH-ключей (`~/.ssh/id_ed25519` или `~/.ssh/id_rsa`).
-2. Публичный ключ добавлен в аккаунт GitHub ([Settings > SSH keys](https://github.com/settings/keys)).
+2. Публичный ключ добавлен в Gitea ([Settings > SSH keys](https://git.kangel.xyz/user/settings/keys)).
 3. Ключ загружен в ssh-agent:
    ```bash
    eval "$(ssh-agent -s)"
@@ -25,17 +25,17 @@ Telegram-бот для управления репозиторием на баз
    ```
 4. Проверь подключение:
    ```bash
-   ssh -T git@github.com
+   ssh -T git@git.kangel.xyz
    ```
 
 ## Установка
 
 ```bash
-cd PluginsBot
 git clone <your repo>
+cd PluginsBot
 python3 -m venv venv
 source venv/bin/activate
-pip install -r ../requirements.txt
+pip install -r requirements.txt
 ```
 
 ## Конфигурация
@@ -49,18 +49,18 @@ nano .env
 
 ## Запуск
 
-Из директории `PluginsBot/`:
+Из корня репозитория (родительской директории `PluginsBot/`):
 
 ```bash
-python3 -m bot_plugins
+python3 -m PluginsBot
 ```
 
-Или из корня репозитория:
+## Отправка плагинов
 
-```bash
-cd ..
-python3 -m bot_plugins
-```
+Плагины можно отправить двумя способами:
+
+- **В личные сообщения боту** — бот проверит подписку на канал, предложит выбрать категорию и отправит заявку в группу на рассмотрение.
+- **Напрямую в группу** — бот обработает файл и создаст карточку с кнопками «Принять / Отклонить».
 
 
 ## Лицензия

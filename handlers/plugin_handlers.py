@@ -248,10 +248,10 @@ def register_plugin_handlers(bot, pending_submissions):
         is_group = message.chat.id == GROUP_ID
         is_updates = message.chat.id == UPDATES_CHAT_ID
 
-        if is_group or is_updates:
+        if is_updates:
             return
 
-        if not is_private:
+        if not is_private and not is_group:
             bot.reply_to(
                 message,
                 f"{EMOJI_CROSS} Отправь плагин мне в личные сообщения (@KPMAppealBot)",
@@ -313,7 +313,7 @@ def register_plugin_handlers(bot, pending_submissions):
 
             exists, current_status = is_plugin_in_store(metadata.get("id"))
 
-            pending_file_data[message.from_user.id] = {
+            submission_data = {
                 "user_id": message.from_user.id,
                 "username": message.from_user.username or "Unknown",
                 "plugin_content": plugin_content,
@@ -328,14 +328,17 @@ def register_plugin_handlers(bot, pending_submissions):
                 "status": current_status if exists else None,
             }
 
-            if exists and current_status:
+            pending_file_data[message.from_user.id] = submission_data
+
+            if is_group or (exists and current_status):
                 _send_to_group(bot, pending_submissions, message.from_user.id)
-                bot.reply_to(
-                    message,
-                    f"{EMOJI_CHECK} Плагин обновлён! Категория: <b>{get_category_label(current_status)}</b>\n"
-                    f"Заявка отправлена в группу на рассмотрение.",
-                    parse_mode="HTML",
-                )
+                if is_private:
+                    bot.reply_to(
+                        message,
+                        f"{EMOJI_CHECK} Плагин обновлён! Категория: <b>{get_category_label(current_status)}</b>\n"
+                        f"Заявка отправлена в группу на рассмотрение.",
+                        parse_mode="HTML",
+                    )
             else:
                 bot.reply_to(
                     message,
