@@ -16,6 +16,8 @@ from PluginsBot.utils.emoji_utils import (
     ID_MESSAGES,
     ID_LIBRARY,
     ID_TRASH,
+    ID_PACKAGE,
+    ID_MEMO,
     EMOJI_CROSS,
     EMOJI_CHECK,
     EMOJI_WAVE,
@@ -26,6 +28,7 @@ from PluginsBot.utils.emoji_utils import (
     EMOJI_MESSAGES_TEXT,
     EMOJI_USER,
     EMOJI_CHART,
+    EMOJI_INFO,
 )
 
 
@@ -79,14 +82,20 @@ def register_command_handlers(bot, pending_submissions):
 
             sent = bot.reply_to(
                 message,
-                f"{EMOJI_WAVE} Привет! Я бот для управления плагинами.\n\n"
-                f"Отправь мне файл плагина (.plugin / .eaf), и я помогу добавить его в хранилище.\n\n"
-                f"{EMOJI_MEMO} <b>Плагин должен содержать:</b>\n"
-                f"• __id__ = \"plugin_id\"\n"
-                f"• __name__ = \"Название\"\n"
-                f"• __version__ = \"1.0.0\"\n"
-                f"• __author__ = \"@username\"\n\n"
-                f"Зависимости детектируются автоматически по импортам.",
+                f"{EMOJI_WAVE} <b>Привет! Я бот для управления плагинами.</b>\n\n"
+                f"Отправь мне файл плагина, и я помогу добавить его в репозиторий.\n\n"
+                f"{EMOJI_PACKAGE} <b>Поддерживаемые форматы:</b>\n"
+                f"• Python плагины: <code>.plugin</code> (до 8 МБ)\n"
+                f"• Elyx архивы: <code>.elyx</code>, <code>.eaf</code>, <code>.zip</code> (до 100 МБ)\n\n"
+                f"{EMOJI_MEMO} <b>Метаданные плагина:</b>\n"
+                f"• <code>__id__</code> = <code>\"plugin_id\"</code> (или <code>id</code> в Elyx)\n"
+                f"• <code>__name__</code> = <code>\"Название\"</code>\n"
+                f"• <code>__version__</code> = <code>\"1.0.0\"</code>\n"
+                f"• <code>__author__</code> = <code>\"@username\"</code>\n"
+                f"• <code>__description__</code> = <code>\"Описание плагина\"</code>\n"
+                f"• <code>__app_version__</code> = <code>\"&gt;=12.5.1\"</code>\n"
+                f"• <code>__requirements__</code> = <code>\"requests, PyYAML\"</code> (опционально)\n\n"
+                f"Зависимости и метаданные определяются автоматически.",
                 parse_mode="HTML",
                 reply_markup=reply_markup,
             )
