@@ -563,9 +563,11 @@ def _build_submission_caption(metadata, submission, pending_submissions=None):
         info_text += f"{EMOJI_CHART_TEXT} Текущий статус: <b>{html.escape(str(submission.get('status')))}</b>\n"
 
     description = metadata.get('description')
-    if description:
-        desc_preview = description[:200] + "..." if len(description) > 200 else description
-        info_text += f"{EMOJI_FILE} Описание: {html.escape(desc_preview)}\n"
+    if description and str(description).strip():
+        desc_str = str(description).replace("\\n", "\n").strip()
+        if len(desc_str) > 600:
+            desc_str = desc_str[:597] + "..."
+        info_text += f"{EMOJI_FILE} Описание:\n<blockquote expandable>{html.escape(desc_str)}</blockquote>\n"
 
     requirements = metadata.get('requirements')
     if requirements:

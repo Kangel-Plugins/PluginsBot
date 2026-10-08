@@ -36,7 +36,10 @@ def send_plugin_update_notification(bot, plugin_id, plugin_name, author, version
         )
 
         if description and str(description).strip():
-            notification_text += f"\n\n<blockquote expandable>{html.escape(str(description).strip())}</blockquote>"
+            desc_clean = str(description).replace("\\n", "\n").strip()
+            if len(desc_clean) > 3000:
+                desc_clean = desc_clean[:2997] + "..."
+            notification_text += f"\n\n<blockquote expandable>{html.escape(desc_clean)}</blockquote>"
 
         keyboard = types.InlineKeyboardMarkup(row_width=2)
         keyboard.add(
