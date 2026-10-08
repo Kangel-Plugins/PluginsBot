@@ -19,7 +19,7 @@ from PluginsBot.utils.emoji_utils import (
 )
 
 
-def send_plugin_update_notification(bot, plugin_id, plugin_name, author, version, is_new, status="plugin"):
+def send_plugin_update_notification(bot, plugin_id, plugin_name, author, version, is_new, status="plugin", description=None):
     try:
         action = f"{EMOJI_PLUS} <b>Новый плагин</b>" if is_new else f"{EMOJI_REFRESH} <b>Обновление плагина</b>"
 
@@ -34,6 +34,9 @@ def send_plugin_update_notification(bot, plugin_id, plugin_name, author, version
             f"{EMOJI_PIN} <b>Версия:</b> {html.escape(str(version))}\n"
             f"{EMOJI_FOLDER} <b>Тип:</b> {type_label}"
         )
+
+        if description and str(description).strip():
+            notification_text += f"\n\n<blockquote expandable>{html.escape(str(description).strip())}</blockquote>"
 
         keyboard = types.InlineKeyboardMarkup(row_width=2)
         keyboard.add(

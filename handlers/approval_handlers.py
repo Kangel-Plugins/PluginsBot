@@ -224,7 +224,8 @@ def register_approval_handlers(bot, pending_submissions):
                 metadata.get('author', 'Unknown'),
                 version,
                 is_new_plugin,
-                status=status
+                status=status,
+                description=metadata.get('description')
             )
 
             if commit_message:

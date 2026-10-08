@@ -141,7 +141,8 @@ def send_demo_message(bot, chat_id, target: str):
             f"{EMOJI_MEMO} <b>Название:</b> Example Plugin\n"
             f"{EMOJI_DEVELOPER} <b>Автор:</b> @developer\n"
             f"{EMOJI_PIN} <b>Версия:</b> 1.0.0\n"
-            f"{EMOJI_FOLDER} <b>Тип:</b> Утилиты"
+            f"{EMOJI_FOLDER} <b>Тип:</b> Утилиты\n\n"
+            f"<blockquote expandable>Тестовое описание плагина для проверки отображения в виде свёрнутой цитаты.</blockquote>"
         )
         sent = bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=kb)
         if check_and_update_from_message(sent) is False and kb:
