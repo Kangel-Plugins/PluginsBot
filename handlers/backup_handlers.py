@@ -28,8 +28,8 @@ def _write_last_ts(ts):
         p = Path(BACKUP_STATE_FILE)
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(str(ts))
-    except Exception as e:
-        print(f"⚠️ Не удалось сохранить время бэкапа: {e}")
+    except Exception as ex:
+        print(f"⚠️ Не удалось сохранить время бэкапа: {ex}")
 
 
 def send_backup(bot, chat_id=None):
@@ -40,8 +40,8 @@ def send_backup(bot, chat_id=None):
 
     try:
         info = build_backup()
-    except Exception as e:
-        print(f"❌ Не удалось собрать бэкап: {e}")
+    except Exception as ex:
+        print(f"❌ Не удалось собрать бэкап: {ex}")
         return False
 
     lock = f"{e(ID_CHECK, '🔒')} зашифрован паролем" if info["encrypted"] else f"{e(ID_WARNING, '⚠️')} БЕЗ шифрования"
@@ -62,8 +62,8 @@ def send_backup(bot, chat_id=None):
         _write_last_ts(time.time())
         print(f"✅ Бэкап отправлен в {cid}: {info['name']}")
         ok = True
-    except Exception as e:
-        print(f"❌ Не удалось отправить бэкап: {e}")
+    except Exception as ex:
+        print(f"❌ Не удалось отправить бэкап: {ex}")
     finally:
         try:
             os.unlink(info["path"])
@@ -81,8 +81,8 @@ def _scheduler(bot):
             interval = max(1.0, float(BACKUP_INTERVAL_HOURS)) * 3600
             if time.time() - _read_last_ts() >= interval:
                 send_backup(bot)
-        except Exception as e:
-            print(f"❌ Ошибка планировщика бэкапа: {e}")
+        except Exception as ex:
+            print(f"❌ Ошибка планировщика бэкапа: {ex}")
         time.sleep(600)
 
 
