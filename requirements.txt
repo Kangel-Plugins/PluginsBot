@@ -2,3 +2,4 @@ pyTelegramBotAPI
 python-dotenv
 cryptography
 telethon
+pyzipper

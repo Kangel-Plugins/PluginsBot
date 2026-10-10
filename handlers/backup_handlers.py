@@ -44,7 +44,10 @@ def send_backup(bot, chat_id=None):
         print(f"❌ Не удалось собрать бэкап: {ex}")
         return False
 
-    lock = f"{e(ID_CHECK, '🔒')} зашифрован паролем" if info["encrypted"] else f"{e(ID_WARNING, '⚠️')} БЕЗ шифрования"
+    if info["encrypted"]:
+        lock = f"{e(ID_CHECK, '🔒')} зашифрован (AES-ZIP, открой 7-Zip по паролю)"
+    else:
+        lock = f"{e(ID_WARNING, '⚠️')} БЕЗ шифрования"
     names = ", ".join(Path(f).name for f in info["files"])
     caption = (
         f"{e(ID_FOLDER, '🗄')} <b>Бэкап KPM</b>\n"

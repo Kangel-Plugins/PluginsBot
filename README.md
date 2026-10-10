@@ -51,7 +51,8 @@ nano .env
 
 Раз в сутки бот сам присылает **создателю** (`BACKUP_CHAT_ID`) архив с ключами и данными:
 `private_key.pem`, `public_key.pem`, `.env`, `store.json` (+ всё, что перечислишь в `BACKUP_INCLUDE`).
-Если задан `KEY_BACKUP_PASSWORD` — архив шифруется (AES-256-GCM, PBKDF2).
+Если задан `KEY_BACKUP_PASSWORD` — архив шифруется **AES-256 ZIP** и открывается обычным
+**7-Zip / WinRAR / Keka** по паролю (Python на приёмной стороне не нужен).
 
 Настройки в `.env`:
 ```
@@ -64,9 +65,10 @@ BACKUP_INCLUDE=<доп. пути через запятую, опциональн
 
 Ручной запуск в любой момент — команда `/backup` в личке боту.
 
-Расшифровать полученный архив (на своей машине):
+Открыть архив: в 7-Zip/WinRAR выбрать `kpm-backup-*.zip` → ввести `KEY_BACKUP_PASSWORD`.
+Резервный способ (без сторонних утилит) — скриптом:
 ```bash
-KEY_BACKUP_PASSWORD=<пароль> python3 scripts/decrypt_backup.py kpm-backup-XXXX.tar.gz.enc ./restore
+KEY_BACKUP_PASSWORD=<пароль> python3 scripts/decrypt_backup.py kpm-backup-XXXX.zip ./restore
 ```
 
 > ⚠️ Без `KEY_BACKUP_PASSWORD` архив уходит **в открытом виде** (ключ окажется в облаке Telegram).
