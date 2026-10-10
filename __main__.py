@@ -15,6 +15,7 @@ from PluginsBot.handlers import register_command_handlers
 from PluginsBot.handlers import register_plugin_handlers
 from PluginsBot.handlers import register_approval_handlers
 from PluginsBot.handlers import register_demo_handlers
+from PluginsBot.handlers import register_backup_handlers
 
 apihelper.CONNECT_TIMEOUT = 500
 apihelper.READ_TIMEOUT = 500
@@ -26,6 +27,7 @@ pending_submissions = {}
 register_command_handlers(bot, pending_submissions)
 register_plugin_handlers(bot, pending_submissions)
 register_approval_handlers(bot, pending_submissions)
+register_backup_handlers(bot)
 
 if IS_DEMO:
     register_demo_handlers(bot)

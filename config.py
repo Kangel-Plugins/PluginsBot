@@ -84,6 +84,12 @@ KNOWN_LIBS = {
 
 PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH", os.path.join(REPO_PATH, "private_key.pem"))
 
+BACKUP_ENABLED = str(os.getenv("BACKUP_ENABLED", "1")).lower() in ("1", "true", "yes", "on")
+BACKUP_CHAT_ID = int(os.getenv("BACKUP_CHAT_ID") or os.getenv("OWNER_ID") or "0")
+BACKUP_INTERVAL_HOURS = float(os.getenv("BACKUP_INTERVAL_HOURS", "24"))
+KEY_BACKUP_PASSWORD = os.getenv("KEY_BACKUP_PASSWORD", "")
+BACKUP_STATE_FILE = os.getenv("BACKUP_STATE_FILE", str(Path(__file__).parent / "data" / "backup_last.txt"))
+
 API_ID = int(os.getenv("API_ID") or os.getenv("TELEGRAM_API_ID") or "0")
 API_HASH = os.getenv("API_HASH") or os.getenv("TELEGRAM_API_HASH") or ""
 FILE_TRANSFER_CHAT_ID = int(os.getenv("FILE_TRANSFER_CHAT_ID") or os.getenv("TRANSFER_CHAT_ID") or str(GROUP_ID))

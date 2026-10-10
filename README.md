@@ -47,6 +47,31 @@ cp .env.example .env
 nano .env
 ```
 
+## Автобэкап ключей и данных
+
+Раз в сутки бот сам присылает **создателю** (`BACKUP_CHAT_ID`) архив с ключами и данными:
+`private_key.pem`, `public_key.pem`, `.env`, `store.json` (+ всё, что перечислишь в `BACKUP_INCLUDE`).
+Если задан `KEY_BACKUP_PASSWORD` — архив шифруется (AES-256-GCM, PBKDF2).
+
+Настройки в `.env`:
+```
+BACKUP_ENABLED=1
+BACKUP_CHAT_ID=<твой telegram user id>
+BACKUP_INTERVAL_HOURS=24
+KEY_BACKUP_PASSWORD=<пароль шифрования архива>
+BACKUP_INCLUDE=<доп. пути через запятую, опционально>
+```
+
+Ручной запуск в любой момент — команда `/backup` в личке боту.
+
+Расшифровать полученный архив (на своей машине):
+```bash
+KEY_BACKUP_PASSWORD=<пароль> python3 scripts/decrypt_backup.py kpm-backup-XXXX.tar.gz.enc ./restore
+```
+
+> ⚠️ Без `KEY_BACKUP_PASSWORD` архив уходит **в открытом виде** (ключ окажется в облаке Telegram).
+> Всегда задавай пароль и храни его отдельно от архива.
+
 ## Запуск
 
 Из корня репозитория (родительской директории `PluginsBot/`):

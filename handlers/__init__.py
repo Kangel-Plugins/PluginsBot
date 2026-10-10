@@ -2,3 +2,4 @@ from .command_handlers import register_command_handlers
 from .plugin_handlers import register_plugin_handlers
 from .approval_handlers import register_approval_handlers
 from .demo_handlers import register_demo_handlers
+from .backup_handlers import register_backup_handlers
