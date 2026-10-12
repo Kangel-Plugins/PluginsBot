@@ -6,7 +6,20 @@ import zipfile
 from typing import Any, Dict, List, Optional, Tuple
 
 from PluginsBot.config import KNOWN_LIBS
-from PluginsBot.utils.store_utils import _extract_string_value, normalize_min_version, normalize_requirements
+from PluginsBot.utils.store_utils import _decode_unicode_escapes, _extract_string_value, normalize_min_version, normalize_requirements
+
+
+class PluginEncodingError(ValueError):
+    pass
+
+
+def _decode_utf8(data: bytes, path: str = "файл плагина") -> str:
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise PluginEncodingError(
+            f"{path} сохранён не в UTF-8 ({exc}). Пересохраните файл в UTF-8 и отправьте заново"
+        ) from exc
 
 
 def extract_plugin_metadata(plugin_content: str) -> Dict[str, Any]:
@@ -102,6 +115,9 @@ def extract_elyx_metadata(zip_content: bytes) -> Dict[str, Any]:
     try:
         with zipfile.ZipFile(io.BytesIO(zip_content), 'r') as zf:
             metadata = _extract_elyx_metadata_from_zip(zf)
+    except PluginEncodingError as e:
+        print(f"[Elyx] Ошибка кодировки: {e}")
+        raise
     except Exception as e:
         print(f"[Elyx] Ошибка извлечения метаданных: {e}")
     return metadata
@@ -112,6 +128,9 @@ def extract_elyx_metadata_from_file(plugin_path: str) -> Dict[str, Any]:
     try:
         with zipfile.ZipFile(plugin_path, 'r') as zf:
             metadata = _extract_elyx_metadata_from_zip(zf)
+    except PluginEncodingError as e:
+        print(f"[Elyx] Ошибка кодировки: {e}")
+        raise
     except Exception as e:
         print(f"[Elyx] Ошибка извлечения метаданных из файла: {e}")
     return metadata
@@ -137,6 +156,8 @@ def _extract_elyx_metadata_from_zip(zf) -> Dict[str, Any]:
                 print(f"[Elyx] refmap содержимое: {refmap}")
             else:
                 refmap = {}
+        except PluginEncodingError:
+            raise
         except Exception as e:
             print(f"[Elyx] Ошибка чтения refmap: {e}")
             refmap = {}
@@ -176,12 +197,14 @@ def _extract_elyx_metadata_from_zip(zf) -> Dict[str, Any]:
 
     try:
         if metainfo_format == 'py':
-            meta = _extract_python_metadata(zf.read(metainfo_path).decode('utf-8'))
+            meta = _extract_python_metadata(_decode_utf8(zf.read(metainfo_path), metainfo_path))
         else:
             meta = _read_structured_file(zf, metainfo_path)
         if not isinstance(meta, dict):
             print(f"[Elyx] Метаданные не являются словарем: {type(meta)}")
             return metadata
+    except PluginEncodingError:
+        raise
     except Exception as e:
         print(f"[Elyx] Ошибка парсинга метаданных: {e}")
         return metadata
@@ -241,7 +264,7 @@ def _metainfo_format(path: str) -> str:
 
 
 def _read_structured_file(zf, path: str) -> Any:
-    raw = zf.read(path).decode('utf-8')
+    raw = _decode_utf8(zf.read(path), path)
     if path.endswith('.json'):
         return json.loads(raw)
     return _parse_simple_yaml(raw)
@@ -405,6 +428,8 @@ def _load_locales(zf, strings_ref: Any = None) -> Dict[str, Dict[str, Any]]:
             locales.setdefault(lang, {})
             locales[lang].update(data)
             print(f"[Elyx] Локали {name}: {len(data)} ключей")
+        except PluginEncodingError:
+            raise
         except Exception:
             pass
     return locales
@@ -540,6 +565,8 @@ def _parse_yaml_scalar(value: str) -> Any:
     if not value:
         return ''
     if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+        if value[0] == '"':
+            return _decode_unicode_escapes(value[1:-1])
         return value[1:-1]
     if value.startswith('{') and value.endswith('}'):
         inner = value[1:-1]

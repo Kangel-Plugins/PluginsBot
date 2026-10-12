@@ -8,6 +8,15 @@ from typing import Any, Dict, List, Optional, Tuple
 from PluginsBot.config import STORE_JSON_FILE, PLUGINS_DIR, KNOWN_LIBS
 
 
+_UNICODE_ESCAPE_RE = re.compile(r'(?<!\\)\\u([0-9a-fA-F]{4})')
+
+
+def _decode_unicode_escapes(text: str) -> str:
+    if not text or '\\u' not in text:
+        return text
+    return _UNICODE_ESCAPE_RE.sub(lambda m: chr(int(m.group(1), 16)), text)
+
+
 def _extract_string_value(content: str, field_name: str) -> Optional[str]:
     triple_patterns = [
         (re.compile(rf'^\s*{re.escape(field_name)}\s*=\s*"""(.*?)"""', re.MULTILINE | re.DOTALL), '"""'),
@@ -17,7 +26,7 @@ def _extract_string_value(content: str, field_name: str) -> Optional[str]:
     for pattern, _ in triple_patterns:
         match = pattern.search(content)
         if match:
-            return match.group(1)
+            return _decode_unicode_escapes(match.group(1))
 
     start_pattern = re.compile(
         rf"^\s*{re.escape(field_name)}\s*=\s*(?P<value>.+)$",
@@ -50,7 +59,7 @@ def _extract_string_value(content: str, field_name: str) -> Optional[str]:
         for s in strings:
             str_content = s[0] if s[0] is not None else s[1] if s[1] is not None else ""
             str_content = str_content.replace('\\n', '\n').replace('\\t', '\t').replace('\\r', '\r')
-            result.append(str_content)
+            result.append(_decode_unicode_escapes(str_content))
 
         return ''.join(result) if result else None
 
@@ -69,6 +78,10 @@ def _strip_literal(raw_value: str) -> Optional[str]:
             char = raw_value[i]
             if char == '\\' and i + 1 < len(raw_value):
                 next_char = raw_value[i + 1]
+                if next_char == 'u' and len(raw_value) - i >= 6 and re.fullmatch(r'[0-9a-fA-F]{4}', raw_value[i + 2:i + 6]):
+                    result.append(chr(int(raw_value[i + 2:i + 6], 16)))
+                    i += 6
+                    continue
                 if next_char == 'n':
                     result.append('\n')
                 elif next_char == 't':
@@ -248,6 +261,9 @@ def extract_metadata_from_plugin(plugin_filename: str) -> Tuple[Optional[str], O
             print(f"[DEBUG] ✓ Найден __requirements__: {requirements}")
         else:
             print(f"[DEBUG] ✗ __requirements__ не найден")
+
+    except UnicodeDecodeError as e:
+        print(f"⚠️ Файл {plugin_filename} сохранён не в UTF-8 ({e}) — метаданные не извлечены. Пересохраните файл в UTF-8")
 
     except Exception as e:
         print(f"⚠️ Ошибка при извлечении метаданных из {plugin_filename}: {e}")

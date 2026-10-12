@@ -6,7 +6,7 @@ from telebot import types
 
 from PluginsBot.config import GROUP_ID, PLUGINS_DIR, UPDATES_CHAT_ID
 from PluginsBot.handlers.command_handlers import CATEGORIES, get_category_label, get_category_name, category_keyboard
-from PluginsBot.utils.plugin_utils import extract_plugin_metadata, detect_dependencies, extract_elyx_metadata
+from PluginsBot.utils.plugin_utils import extract_plugin_metadata, detect_dependencies, extract_elyx_metadata, PluginEncodingError
 from PluginsBot.utils.download_utils import (
     download_plugin_file,
     is_elyx_plugin,
@@ -301,11 +301,30 @@ def register_plugin_handlers(bot, pending_submissions):
                 is_elyx = True
 
             if is_elyx:
-                metadata = extract_elyx_metadata(downloaded_file)
+                try:
+                    metadata = extract_elyx_metadata(downloaded_file)
+                except PluginEncodingError:
+                    bot.reply_to(
+                        message,
+                        f"{EMOJI_CROSS} Внутри архива есть файл, сохранённый не в UTF-8.\n\n"
+                        f"Пересохраните <b>metainfo</b>, <b>refmap</b> и файлы локализации в UTF-8 "
+                        f"(в PyCharm/VS Code: File Encoding → UTF-8) и отправьте заново.",
+                        parse_mode="HTML"
+                    )
+                    return
                 dependencies = []
                 plugin_content = downloaded_file
             else:
-                plugin_content = downloaded_file.decode("utf-8", errors="ignore")
+                try:
+                    plugin_content = downloaded_file.decode("utf-8")
+                except UnicodeDecodeError:
+                    bot.reply_to(
+                        message,
+                        f"{EMOJI_CROSS} Файл плагина сохранён не в UTF-8.\n\n"
+                        f"Пересохраните его в UTF-8 и отправьте заново.",
+                        parse_mode="HTML"
+                    )
+                    return
                 metadata = extract_plugin_metadata(plugin_content)
                 dependencies = detect_dependencies(plugin_content, metadata.get("id"))
 
