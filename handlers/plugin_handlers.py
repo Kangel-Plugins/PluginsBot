@@ -1,5 +1,4 @@
 import os
-import re
 import tempfile
 import html
 from telebot import types
@@ -140,6 +139,8 @@ def _send_to_group(bot, pending_submissions, user_id):
 
     info_text += f"\n{EMOJI_FILE} Файл: <code>{html.escape(data.get('plugin_file', 'N/A'))}</code>"
 
+    pending_submissions[submission_id]["caption_html"] = info_text
+
     is_elyx = data.get("is_elyx", False)
     plugin_content = data["plugin_content"]
     file_id = data.get("file_id")
@@ -198,13 +199,10 @@ def register_plugin_handlers(bot, pending_submissions):
             return
 
         pending_submissions[submission_id]["status"] = new_status
-        caption = call.message.caption or ""
 
-        status_pattern = re.compile(r"\n?(?:<tg-emoji[^>]*>)?📊(?:</tg-emoji>)? Выбранный статус: <b>.*?</b>")
-        caption = status_pattern.sub("", caption)
-
+        base_html = pending_submissions[submission_id].get("caption_html") or call.message.caption or ""
         cat_lbl = get_category_label(new_status)
-        info_text = caption + f"\n{EMOJI_CHART_TEXT} Выбранный статус: <b>{cat_lbl}</b>"
+        info_text = base_html + f"\n{EMOJI_CHART_TEXT} Выбранный статус: <b>{cat_lbl}</b>"
 
         bot.edit_message_caption(
             caption=info_text,
