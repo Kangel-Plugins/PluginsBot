@@ -1,11 +1,12 @@
 # PluginsBot
 
-Telegram-бот для управления репозиторием на базе [KPM Store](https://git.kangel.xyz/KangelPlugins/Plugins-Store) 
+Telegram-бот для управления репозиторием на базе [KPM Store](https://git.kangel.xyz/KangelPlugins/Plugins-Store) на базе **aiogram 3.x**.
 
 
 ## Требования
 
-- Python 3.10+
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/) (быстрый менеджер пакетов и виртуальных окружений)
 - Git с SSH-доступом к репозиторию магазина
 - SSH-ключ, добавленный в Gitea (бот пушит через SSH)
 - Токен Telegram-бота
@@ -33,9 +34,7 @@ Telegram-бот для управления репозиторием на баз
 ```bash
 git clone <your repo>
 cd PluginsBot
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+uv sync
 ```
 
 ## Конфигурация
@@ -46,6 +45,25 @@ pip install -r requirements.txt
 cp .env.example .env
 nano .env
 ```
+
+## Запуск
+
+Запуск бота осуществляется через `uv`:
+
+```bash
+# Обычный запуск:
+uv run bot
+
+# Демо-режим (тестирование вёрстки сообщений и интерактивных кнопок):
+uv run bot --demo
+```
+
+> **Совет**: Если вы активируете виртуальное окружение (`source .venv/bin/activate` на Linux/macOS или `.venv\Scripts\Activate.ps1` на Windows), бот доступен напрямую командой:
+> ```bash
+> bot
+> # или
+> bot --demo
+> ```
 
 ## Автобэкап ключей и данных
 
@@ -68,19 +86,11 @@ BACKUP_INCLUDE=<доп. пути через запятую, опциональн
 Открыть архив: в 7-Zip/WinRAR выбрать `kpm-backup-*.zip` → ввести `KEY_BACKUP_PASSWORD`.
 Резервный способ (без сторонних утилит) — скриптом:
 ```bash
-KEY_BACKUP_PASSWORD=<пароль> python3 scripts/decrypt_backup.py kpm-backup-XXXX.zip ./restore
+KEY_BACKUP_PASSWORD=<пароль> uv run scripts/decrypt_backup.py kpm-backup-XXXX.zip ./restore
 ```
 
 > ⚠️ Без `KEY_BACKUP_PASSWORD` архив уходит **в открытом виде** (ключ окажется в облаке Telegram).
 > Всегда задавай пароль и храни его отдельно от архива.
-
-## Запуск
-
-Из корня репозитория (родительской директории `PluginsBot/`):
-
-```bash
-python3 -m PluginsBot
-```
 
 ## Отправка плагинов
 
