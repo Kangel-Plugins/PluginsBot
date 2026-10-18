@@ -6,7 +6,7 @@ import shutil
 import hashlib
 import asyncio
 from aiogram import Router, F, Bot
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, ForceReply
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup
 
 from PluginsBot.config import (
     GROUP_ID,
@@ -283,10 +283,18 @@ async def handle_reject(call: CallbackQuery, bot: Bot, pending_submissions: dict
 
     submission = pending_submissions[submission_id]
     plugin_id = submission["metadata"].get("id")
+    plugin_name = submission["metadata"].get("name", "N/A")
+    username = submission.get("username", "Unknown")
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
+                make_inline_button(
+                    "Назад",
+                    callback_data=f"rejx_{submission_id}",
+                    emoji_id=ID_BACK,
+                    fallback_emoji="◀️",
+                ),
                 make_inline_button(
                     "Да, отклонить (без причины)",
                     callback_data=f"rejc_{submission_id}",
@@ -294,36 +302,34 @@ async def handle_reject(call: CallbackQuery, bot: Bot, pending_submissions: dict
                     fallback_emoji="❌",
                     style="danger",
                 ),
-                make_inline_button(
-                    "Назад",
-                    callback_data=f"rejx_{submission_id}",
-                    emoji_id=ID_BACK,
-                    fallback_emoji="◀️",
-                ),
             ]
         ]
     )
 
-    await call.message.edit_reply_markup(reply_markup=keyboard)
-
-    prompt_msg = await call.message.reply(
-        f"✍️ <b>Укажите причину отказа</b> для плагина <code>{html.escape(str(plugin_id))}</code>:\n"
-        f"<i>Ответьте (Reply) на это сообщение текстом причины, или нажмите кнопку на карточке.</i>",
-        reply_markup=ForceReply(selective=True),
+    rejection_caption = (
+        f"{EMOJI_CROSS} <b>Отклонение плагина</b>\n\n"
+        f"{EMOJI_PACKAGE} ID: <code>{html.escape(str(plugin_id))}</code>\n"
+        f"{EMOJI_MEMO} Название: {html.escape(str(plugin_name))}\n"
+        f"{EMOJI_DEVELOPER} Автор: @{html.escape(str(username))}\n\n"
+        f"Введите причину отказа следующим сообщением в чат или подтвердите кнопкой."
     )
+
+    try:
+        await call.message.edit_caption(caption=rejection_caption, reply_markup=keyboard)
+    except Exception:
+        await call.message.edit_reply_markup(reply_markup=keyboard)
 
     rejection_info = {
         "submission_id": submission_id,
         "group_message_id": call.message.message_id,
-        "prompt_message_id": prompt_msg.message_id,
         "chat_id": call.message.chat.id,
         "admin_user": call.from_user,
     }
 
-    pending_rejections[prompt_msg.message_id] = rejection_info
+    pending_rejections[call.message.message_id] = rejection_info
     pending_rejections[f"sub_{submission_id}"] = rejection_info
 
-    await call.answer("Ответьте на сообщение бота с причиной")
+    await call.answer("Введите причину отказа сообщением в чат или подтвердите")
 
 
 @router.callback_query(F.data.startswith("rejc_"))
@@ -336,17 +342,10 @@ async def handle_reject_confirm(call: CallbackQuery, bot: Bot, pending_submissio
 
     sub_key = f"sub_{submission_id}"
     pending = pending_rejections.pop(sub_key, None)
-
     if pending:
-        prompt_message_id = pending.get("prompt_message_id")
-        if prompt_message_id:
-            pending_rejections.pop(prompt_message_id, None)
-            try:
-                await bot.delete_message(call.message.chat.id, prompt_message_id)
-            except Exception:
-                pass
-    else:
-        pending = {"submission_id": submission_id, "admin_user": call.from_user}
+        card_id = pending.get("group_message_id")
+        if card_id:
+            pending_rejections.pop(card_id, None)
 
     if submission_id not in pending_submissions:
         await call.answer("❌ Заявка не найдена", show_alert=True)
@@ -358,7 +357,7 @@ async def handle_reject_confirm(call: CallbackQuery, bot: Bot, pending_submissio
         pass
 
     submission = pending_submissions[submission_id]
-    admin_user = pending.get("admin_user", call.from_user)
+    admin_user = call.from_user
     await _execute_rejection(bot, pending_submissions, submission_id, "Причина не указана", submission, call.message, admin_user)
     await call.answer("✅ Плагин отклонён")
 
@@ -374,13 +373,9 @@ async def handle_reject_cancel(call: CallbackQuery, bot: Bot, pending_submission
     sub_key = f"sub_{submission_id}"
     pending = pending_rejections.pop(sub_key, None)
     if pending:
-        prompt_message_id = pending.get("prompt_message_id")
-        if prompt_message_id:
-            pending_rejections.pop(prompt_message_id, None)
-            try:
-                await bot.delete_message(call.message.chat.id, prompt_message_id)
-            except Exception:
-                pass
+        card_id = pending.get("group_message_id")
+        if card_id:
+            pending_rejections.pop(card_id, None)
 
     if submission_id not in pending_submissions:
         await call.answer("❌ Заявка не найдена", show_alert=True)
@@ -389,26 +384,71 @@ async def handle_reject_cancel(call: CallbackQuery, bot: Bot, pending_submission
     from PluginsBot.handlers.plugin_handlers import create_approval_keyboard
 
     submission = pending_submissions[submission_id]
+    metadata = submission["metadata"]
     needs_status = not submission.get("status")
 
-    await call.message.edit_reply_markup(
-        reply_markup=create_approval_keyboard(submission_id, needs_status=needs_status),
-    )
+    info_text = _build_submission_caption(metadata, submission)
+
+    try:
+        await call.message.edit_caption(
+            caption=info_text,
+            reply_markup=create_approval_keyboard(submission_id, needs_status=needs_status),
+        )
+    except Exception:
+        await call.message.edit_reply_markup(
+            reply_markup=create_approval_keyboard(submission_id, needs_status=needs_status),
+        )
     await call.answer("Отменено")
 
 
-@router.message(F.chat.id == GROUP_ID, F.reply_to_message, F.text, ~F.text.startswith("/"))
-async def handle_reject_reply(message: Message, bot: Bot, pending_submissions: dict):
-    reply_msg_id = message.reply_to_message.message_id
-    if reply_msg_id not in pending_rejections:
+def _find_pending_rejection(message: Message) -> dict | None:
+    if not message.text or message.text.startswith("/"):
+        return None
+
+    # 1. Если ответили напрямую на карточку заявки
+    if message.reply_to_message:
+        reply_id = message.reply_to_message.message_id
+        pending = pending_rejections.get(reply_id)
+        if pending and isinstance(pending, dict):
+            initiator = pending.get("admin_user")
+            if initiator and message.from_user.id != initiator.id:
+                return None
+            return pending
+
+    # 2. Обычное сообщение в чате от того, кто нажал «Отклонить»
+    user_candidates = [
+        v for k, v in pending_rejections.items()
+        if isinstance(k, str) and k.startswith("sub_") and isinstance(v, dict)
+        and v.get("admin_user") and v.get("admin_user").id == message.from_user.id
+        and v.get("chat_id") == message.chat.id
+    ]
+    if user_candidates:
+        return user_candidates[-1]
+
+    return None
+
+
+def _is_rejection_reason_message(message: Message) -> bool:
+    if message.chat.id != GROUP_ID:
+        return False
+    return _find_pending_rejection(message) is not None
+
+
+@router.message(_is_rejection_reason_message)
+async def handle_reject_reason(message: Message, bot: Bot, pending_submissions: dict):
+    pending = _find_pending_rejection(message)
+    if not pending:
         return
 
-    pending = pending_rejections.pop(reply_msg_id)
     submission_id = pending["submission_id"]
-    pending_rejections.pop(f"sub_{submission_id}", None)
-
     group_message_id = pending.get("group_message_id")
-    admin_user = message.from_user
+    initiator = pending.get("admin_user")
+    admin_user = initiator or message.from_user
+
+    # Удаляем ожидания отклонения для данной заявки
+    pending_rejections.pop(f"sub_{submission_id}", None)
+    if group_message_id:
+        pending_rejections.pop(group_message_id, None)
 
     if submission_id not in pending_submissions:
         await message.reply(f"{EMOJI_CROSS} Заявка уже обработана")
@@ -419,11 +459,6 @@ async def handle_reject_reply(message: Message, bot: Bot, pending_submissions: d
 
     try:
         await message.delete()
-    except Exception:
-        pass
-
-    try:
-        await bot.delete_message(message.chat.id, reply_msg_id)
     except Exception:
         pass
 

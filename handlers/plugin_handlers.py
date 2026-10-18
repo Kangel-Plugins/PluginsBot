@@ -200,7 +200,9 @@ async def handle_status_selection(call: CallbackQuery, pending_submissions: dict
 
     pending_submissions[submission_id]["status"] = new_status
 
-    base_html = pending_submissions[submission_id].get("caption_html") or call.message.caption or ""
+    base_html = pending_submissions[submission_id].get("caption_html")
+    if not base_html:
+        base_html = (call.message.html_text if hasattr(call.message, "html_text") else call.message.caption) or ""
     status_pattern = re.compile(r"\n?(?:<tg-emoji[^>]*>)?📊(?:</tg-emoji>)? Выбранный статус: <b>.*?</b>")
     base_html = status_pattern.sub("", base_html)
 

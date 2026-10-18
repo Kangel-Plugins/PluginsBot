@@ -8,7 +8,6 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
     InlineKeyboardMarkup,
-    ForceReply,
 )
 
 from PluginsBot.handlers.command_handlers import (
@@ -110,17 +109,17 @@ def _get_demo_rejection_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 make_inline_button(
+                    "Назад",
+                    callback_data="demo_rejx",
+                    emoji_id=ID_BACK,
+                    fallback_emoji="◀️",
+                ),
+                make_inline_button(
                     "Да, отклонить (без причины)",
                     callback_data="demo_rejc",
                     emoji_id=ID_CROSS,
                     fallback_emoji="❌",
                     style="danger",
-                ),
-                make_inline_button(
-                    "Назад",
-                    callback_data="demo_rejx",
-                    emoji_id=ID_BACK,
-                    fallback_emoji="◀️",
                 ),
             ]
         ]
@@ -170,35 +169,43 @@ def _get_demo_keyboard(target: str) -> InlineKeyboardMarkup | None:
     return None
 
 
+def _build_demo_card_text(selected_status_key: str | None = None) -> str:
+    text = (
+        f"{EMOJI_CLIPBOARD} <b>Новая заявка на плагин</b>\n\n"
+        f"{EMOJI_USER} От: @username\n"
+        f"{EMOJI_PACKAGE} ID: <code>example_plugin</code>\n"
+        f"{EMOJI_MEMO} Название: Example Plugin\n"
+        f"{EMOJI_DEVELOPER} Автор: @developer\n"
+        f"{EMOJI_PIN} Версия: 1.0.0\n"
+        f"{EMOJI_MOBILE} Min version: 1.0.0\n"
+        f"{EMOJI_MOBILE_ARROW} App version: 2.0.0\n"
+        f"{EMOJI_FOLDER} Категория: <b>{get_category_label('utilities')}</b>\n"
+        f"{EMOJI_FILE} Описание:\n"
+        f"<blockquote expandable>Это подробное расширенное описание плагина для проверки и демонстрации работы свёрнутой цитаты в Telegram.\n\n"
+        f"Основные возможности и функции:\n"
+        f"• Автоматическая синхронизация настроек и конфигурационных файлов между сессиями.\n"
+        f"• Поддержка кастомных тем оформления, шрифтов и цветовых палитр интерфейса.\n"
+        f"• Встроенный менеджер быстрых действий и горячих клавиш для ускорения работы.\n"
+        f"• Интеграция с внешними API, облачными сервисами и локальными базами данных.\n"
+        f"• Детальное логирование событий, экспорт отчётов и встроенная система самодиагностики.\n\n"
+        f"Для работы требуются установленные зависимости и актуальная версия приложения. "
+        f"Нажмите на блок цитаты, чтобы развернуть или свернуть полный текст описания.</blockquote>\n"
+        f"{EMOJI_PACKAGE} Requirements: telebot, requests\n"
+        f"{EMOJI_LIBRARY_TEXT} Зависимости: mandre_lib\n"
+        f"{EMOJI_LINK} Требует: base_plugin (1.0.0)\n\n"
+        f"{EMOJI_FILE} Файл: <code>example_plugin.plugin</code>"
+    )
+    if selected_status_key:
+        cat_lbl = get_category_label(selected_status_key)
+        text += f"\n{EMOJI_CHART_TEXT} Выбранный статус: <b>{cat_lbl}</b>"
+    return text
+
+
 async def send_demo_message(bot: Bot, chat_id: int, target: str):
     kb = _get_demo_keyboard(target)
 
     if target == "card":
-        text = (
-            f"{EMOJI_CLIPBOARD} <b>Новая заявка на плагин</b>\n\n"
-            f"{EMOJI_USER} От: @username\n"
-            f"{EMOJI_PACKAGE} ID: <code>example_plugin</code>\n"
-            f"{EMOJI_MEMO} Название: Example Plugin\n"
-            f"{EMOJI_DEVELOPER} Автор: @developer\n"
-            f"{EMOJI_PIN} Версия: 1.0.0\n"
-            f"{EMOJI_MOBILE} Min version: 1.0.0\n"
-            f"{EMOJI_MOBILE_ARROW} App version: 2.0.0\n"
-            f"{EMOJI_FOLDER} Категория: <b>{get_category_label('utilities')}</b>\n"
-            f"{EMOJI_FILE} Описание:\n"
-            f"<blockquote expandable>Это подробное расширенное описание плагина для проверки и демонстрации работы свёрнутой цитаты в Telegram.\n\n"
-            f"Основные возможности и функции:\n"
-            f"• Автоматическая синхронизация настроек и конфигурационных файлов между сессиями.\n"
-            f"• Поддержка кастомных тем оформления, шрифтов и цветовых палитр интерфейса.\n"
-            f"• Встроенный менеджер быстрых действий и горячих клавиш для ускорения работы.\n"
-            f"• Интеграция с внешними API, облачными сервисами и локальными базами данных.\n"
-            f"• Детальное логирование событий, экспорт отчётов и встроенная система самодиагностики.\n\n"
-            f"Для работы требуются установленные зависимости и актуальная версия приложения. "
-            f"Нажмите на блок цитаты, чтобы развернуть или свернуть полный текст описания.</blockquote>\n"
-            f"{EMOJI_PACKAGE} Requirements: telebot, requests\n"
-            f"{EMOJI_LIBRARY_TEXT} Зависимости: mandre_lib\n"
-            f"{EMOJI_LINK} Требует: base_plugin (1.0.0)\n\n"
-            f"{EMOJI_FILE} Файл: <code>example_plugin.plugin</code>"
-        )
+        text = _build_demo_card_text()
         sent = await bot.send_message(chat_id, text, reply_markup=kb)
         if check_and_update_from_message(sent) is False and kb:
             try:
@@ -248,7 +255,7 @@ async def send_demo_message(bot: Bot, chat_id: int, target: str):
             f"{EMOJI_MEMO} <b>Название:</b> Example Plugin\n"
             f"{EMOJI_DEVELOPER} <b>Автор:</b> @developer\n"
             f"{EMOJI_PIN} <b>Версия:</b> 1.0.0\n"
-            f"{EMOJI_FOLDER} <b>Тип:</b> Утилиты\n\n"
+            f"{EMOJI_FOLDER} <b>Тип:</b> {get_category_label('utilities')}\n\n"
             f"<blockquote expandable>Это подробное расширенное описание плагина для проверки и демонстрации работы свёрнутой цитаты в Telegram.\n\n"
             f"Основные возможности и функции:\n"
             f"• Автоматическая синхронизация настроек и конфигурационных файлов между сессиями.\n"
@@ -362,12 +369,8 @@ async def handle_demo_emojis(message: Message, bot: Bot):
 async def handle_demo_status_selection(call: CallbackQuery):
     cat_key = call.data[len("demo_cat_"):]
     cat_name = get_category_name(cat_key)
-    cat_lbl = get_category_label(cat_key)
 
-    current_text = call.message.text or call.message.caption or ""
-    status_pattern = re.compile(r"\n?(?:<tg-emoji[^>]*>)?📊(?:</tg-emoji>)? Выбранный статус: <b>.*?</b>")
-    base_text = status_pattern.sub("", current_text)
-    new_text = base_text + f"\n{EMOJI_CHART_TEXT} Выбранный статус: <b>{cat_lbl}</b>"
+    new_text = _build_demo_card_text(selected_status_key=cat_key)
 
     kb = _get_demo_card_keyboard(needs_status=False)
     try:
@@ -385,13 +388,8 @@ async def handle_demo_status_selection(call: CallbackQuery):
 async def handle_demo_approve(call: CallbackQuery, bot: Bot):
     await call.answer("✅ Плагин успешно добавлен!", show_alert=True)
 
-    prompt_id = demo_rejections.pop(f"card_{call.message.message_id}", None)
-    if prompt_id:
-        demo_rejections.pop(prompt_id, None)
-        try:
-            await bot.delete_message(call.message.chat.id, prompt_id)
-        except Exception:
-            pass
+    demo_rejections.pop(call.message.message_id, None)
+    demo_rejections.pop(f"card_{call.message.message_id}", None)
 
     try:
         await call.message.delete()
@@ -412,47 +410,38 @@ async def handle_demo_approve(call: CallbackQuery, bot: Bot):
 @router.callback_query(F.data == "demo_reject")
 async def handle_demo_reject(call: CallbackQuery, bot: Bot):
     kb = _get_demo_rejection_keyboard()
-    try:
-        await call.message.edit_reply_markup(reply_markup=kb)
-    except Exception:
-        pass
 
-    old_prompt_id = demo_rejections.get(f"card_{call.message.message_id}")
-    if old_prompt_id:
-        demo_rejections.pop(old_prompt_id, None)
-        try:
-            await bot.delete_message(call.message.chat.id, old_prompt_id)
-        except Exception:
-            pass
-
-    prompt_msg = await call.message.reply(
-        "✍️ <b>Укажите причину отказа</b> для плагина <code>example_plugin</code>:\n"
-        "<i>Ответьте (Reply) на это сообщение текстом причины, или нажмите кнопку на карточке.</i>",
-        reply_markup=ForceReply(selective=True),
+    rejection_text = (
+        f"{EMOJI_CROSS} <b>Отклонение плагина (демо)</b>\n\n"
+        f"{EMOJI_PACKAGE} ID: <code>example_plugin</code>\n"
+        f"{EMOJI_MEMO} Название: Example Plugin\n"
+        f"{EMOJI_DEVELOPER} Автор: @developer\n\n"
+        f"Введите причину отказа следующим сообщением в чат или подтвердите кнопкой."
     )
+
+    try:
+        if call.message.caption:
+            await call.message.edit_caption(caption=rejection_text, reply_markup=kb)
+        else:
+            await call.message.edit_text(text=rejection_text, reply_markup=kb)
+    except Exception:
+        await call.message.edit_reply_markup(reply_markup=kb)
 
     rejection_info = {
         "card_message_id": call.message.message_id,
-        "prompt_message_id": prompt_msg.message_id,
         "chat_id": call.message.chat.id,
+        "admin_user": call.from_user,
     }
 
-    demo_rejections[prompt_msg.message_id] = rejection_info
-    demo_rejections[f"card_{call.message.message_id}"] = prompt_msg.message_id
+    demo_rejections[call.message.message_id] = rejection_info
 
-    await call.answer("Ответьте на сообщение бота с причиной")
+    await call.answer("Введите причину отказа сообщением в чат или подтвердите")
 
 
 @router.callback_query(F.data == "demo_rejc")
 async def handle_demo_reject_confirm(call: CallbackQuery, bot: Bot):
     card_msg_id = call.message.message_id
-    prompt_id = demo_rejections.pop(f"card_{card_msg_id}", None)
-    if prompt_id:
-        demo_rejections.pop(prompt_id, None)
-        try:
-            await bot.delete_message(call.message.chat.id, prompt_id)
-        except Exception:
-            pass
+    demo_rejections.pop(card_msg_id, None)
 
     try:
         await call.message.delete()
@@ -485,46 +474,65 @@ async def handle_demo_reject_confirm(call: CallbackQuery, bot: Bot):
 @router.callback_query(F.data == "demo_rejx")
 async def handle_demo_reject_cancel(call: CallbackQuery, bot: Bot):
     card_msg_id = call.message.message_id
-    prompt_id = demo_rejections.pop(f"card_{card_msg_id}", None)
-    if prompt_id:
-        demo_rejections.pop(prompt_id, None)
-        try:
-            await bot.delete_message(call.message.chat.id, prompt_id)
-        except Exception:
-            pass
+    demo_rejections.pop(card_msg_id, None)
 
-    msg_text = call.message.text or call.message.caption or ""
-    needs_status = "Выбранный статус:" not in msg_text
+    original_text = _build_demo_card_text()
+    kb = _get_demo_card_keyboard(needs_status=True)
 
-    await call.message.edit_reply_markup(
-        reply_markup=_get_demo_card_keyboard(needs_status=needs_status),
-    )
+    try:
+        if call.message.caption:
+            await call.message.edit_caption(caption=original_text, reply_markup=kb)
+        else:
+            await call.message.edit_text(text=original_text, reply_markup=kb)
+    except Exception:
+        await call.message.edit_reply_markup(reply_markup=kb)
+
     await call.answer("Отменено")
 
 
-def _is_demo_rejection_reply(message: Message) -> bool:
-    return bool(message.reply_to_message and message.reply_to_message.message_id in demo_rejections)
+def _find_demo_rejection(message: Message) -> dict | None:
+    if not message.text or message.text.startswith("/"):
+        return None
+
+    # 1. Если ответили напрямую на карточку
+    if message.reply_to_message:
+        reply_id = message.reply_to_message.message_id
+        info = demo_rejections.get(reply_id)
+        if info and isinstance(info, dict):
+            initiator = info.get("admin_user")
+            if initiator and message.from_user.id != initiator.id:
+                return None
+            return info
+
+    # 2. Обычное сообщение в чате от инициатора
+    for k, v in demo_rejections.items():
+        if isinstance(v, dict) and v.get("chat_id") == message.chat.id:
+            initiator = v.get("admin_user")
+            if initiator and initiator.id == message.from_user.id:
+                return v
+
+    return None
 
 
-@router.message(_is_demo_rejection_reply, F.text, ~F.text.startswith("/"))
+def _is_demo_rejection_message(message: Message) -> bool:
+    return _find_demo_rejection(message) is not None
+
+
+@router.message(_is_demo_rejection_message)
 async def handle_demo_reject_reply(message: Message, bot: Bot):
-    reply_msg_id = message.reply_to_message.message_id
-    info = demo_rejections.pop(reply_msg_id, None)
+    info = _find_demo_rejection(message)
     if not info or not isinstance(info, dict):
         return
 
-    card_msg_id = info["card_message_id"]
-    demo_rejections.pop(f"card_{card_msg_id}", None)
+    initiator = info.get("admin_user")
+    card_msg_id = info.get("card_message_id")
+    if card_msg_id:
+        demo_rejections.pop(card_msg_id, None)
 
     reason = message.text.strip() or "Причина не указана"
 
     try:
         await message.delete()
-    except Exception:
-        pass
-
-    try:
-        await bot.delete_message(message.chat.id, reply_msg_id)
     except Exception:
         pass
 
@@ -534,7 +542,7 @@ async def handle_demo_reject_reply(message: Message, bot: Bot):
         except Exception:
             pass
 
-    admin_display = _get_admin_display(message.from_user)
+    admin_display = _get_admin_display(initiator or message.from_user)
 
     author_text = (
         f"{EMOJI_CROSS} <b>Плагин отклонён (демо)</b>\n\n"
