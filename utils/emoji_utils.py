@@ -1,4 +1,4 @@
-from telebot import types
+from aiogram.types import InlineKeyboardButton, Message
 
 USE_CUSTOM_EMOJI: bool = True
 _CHECKED_WITH_TELEGRAM: bool = False
@@ -14,7 +14,7 @@ def is_custom_emoji_enabled() -> bool:
     return USE_CUSTOM_EMOJI
 
 
-def check_and_update_from_message(message: types.Message) -> bool:
+def check_and_update_from_message(message: Message) -> bool:
     global USE_CUSTOM_EMOJI, _CHECKED_WITH_TELEGRAM
     if not message:
         return USE_CUSTOM_EMOJI
@@ -94,12 +94,12 @@ def make_inline_button(
     emoji_id: str | None = None,
     fallback_emoji: str = "",
     style: str | None = None,
-) -> types.InlineKeyboardButton:
+) -> InlineKeyboardButton:
     if USE_CUSTOM_EMOJI and emoji_id:
         kwargs = {}
         if style:
             kwargs["style"] = style
-        return types.InlineKeyboardButton(
+        return InlineKeyboardButton(
             text=text,
             callback_data=callback_data,
             url=url,
@@ -111,7 +111,7 @@ def make_inline_button(
         kwargs = {}
         if style:
             kwargs["style"] = style
-        return types.InlineKeyboardButton(
+        return InlineKeyboardButton(
             text=label,
             callback_data=callback_data,
             url=url,

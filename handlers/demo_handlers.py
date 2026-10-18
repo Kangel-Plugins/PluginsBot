@@ -1,4 +1,11 @@
-from telebot import types
+from aiogram import Router, F, Bot
+from aiogram.types import (
+    Message,
+    CallbackQuery,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+)
 
 from PluginsBot.handlers.command_handlers import CATEGORIES, get_category_label
 from PluginsBot.utils.emoji_utils import (
@@ -11,7 +18,6 @@ from PluginsBot.utils.emoji_utils import (
     ID_REFRESH,
     EMOJI_CROSS,
     EMOJI_CHECK,
-    EMOJI_WAVE,
     EMOJI_MEMO,
     EMOJI_PACKAGE,
     EMOJI_DEVELOPER,
@@ -38,47 +44,63 @@ from PluginsBot.utils.emoji_utils import (
     EMOJI_GAME,
 )
 
-
-def demo_reply_keyboard():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row("📋 Карточка заявки", "✅ Плагин одобрен")
-    markup.row("❌ Плагин отклонён", "🗑 Удаление плагина")
-    markup.row("📢 Пост в канал", "📊 Статус очереди")
-    markup.row("🎨 Все эмодзи")
-    return markup
+router = Router()
 
 
-def _get_demo_keyboard(target: str) -> types.InlineKeyboardMarkup | None:
+def demo_reply_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📋 Карточка заявки"), KeyboardButton(text="✅ Плагин одобрен")],
+            [KeyboardButton(text="❌ Плагин отклонён"), KeyboardButton(text="🗑 Удаление плагина")],
+            [KeyboardButton(text="📢 Пост в канал"), KeyboardButton(text="📊 Статус очереди")],
+            [KeyboardButton(text="🎨 Все эмодзи")],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def _get_demo_keyboard(target: str) -> InlineKeyboardMarkup | None:
     if target == "card":
-        kb = types.InlineKeyboardMarkup(row_width=2)
-        kb.row(
-            make_inline_button("Принять", callback_data="test_msg_dummy", emoji_id=ID_CHECK, fallback_emoji="✅", style="success"),
-            make_inline_button("Отклонить", callback_data="test_msg_dummy", emoji_id=ID_CROSS, fallback_emoji="❌", style="danger"),
-        )
+        rows = [
+            [
+                make_inline_button("Принять", callback_data="test_msg_dummy", emoji_id=ID_CHECK, fallback_emoji="✅", style="success"),
+                make_inline_button("Отклонить", callback_data="test_msg_dummy", emoji_id=ID_CROSS, fallback_emoji="❌", style="danger"),
+            ]
+        ]
+        cat_row = []
         for key, (name, fallback, emoji_id) in CATEGORIES.items():
-            kb.add(make_inline_button(name, callback_data="test_msg_dummy", emoji_id=emoji_id, fallback_emoji=fallback))
-        return kb
+            cat_row.append(make_inline_button(name, callback_data="test_msg_dummy", emoji_id=emoji_id, fallback_emoji=fallback))
+            if len(cat_row) == 2:
+                rows.append(cat_row)
+                cat_row = []
+        if cat_row:
+            rows.append(cat_row)
+        return InlineKeyboardMarkup(inline_keyboard=rows)
 
     elif target == "delete":
-        kb = types.InlineKeyboardMarkup(row_width=2)
-        kb.add(
-            make_inline_button("Да, удалить", callback_data="test_msg_dummy", emoji_id=ID_TRASH, fallback_emoji="✅", style="danger"),
-            make_inline_button("Отмена", callback_data="test_msg_dummy", emoji_id=ID_CROSS, fallback_emoji="❌"),
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    make_inline_button("Да, удалить", callback_data="test_msg_dummy", emoji_id=ID_TRASH, fallback_emoji="✅", style="danger"),
+                    make_inline_button("Отмена", callback_data="test_msg_dummy", emoji_id=ID_CROSS, fallback_emoji="❌"),
+                ]
+            ]
         )
-        return kb
 
     elif target == "channel":
-        kb = types.InlineKeyboardMarkup(row_width=2)
-        kb.add(
-            make_inline_button("Установить", url="tg://kpm_install?plugin=example_plugin", emoji_id=ID_DOWNLOAD, fallback_emoji="⬇️", style="primary"),
-            make_inline_button("Обновить список", url="tg://kpm_list", emoji_id=ID_REFRESH, fallback_emoji="🔄"),
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    make_inline_button("Установить", url="tg://kpm_install?plugin=example_plugin", emoji_id=ID_DOWNLOAD, fallback_emoji="⬇️", style="primary"),
+                    make_inline_button("Обновить список", url="tg://kpm_list", emoji_id=ID_REFRESH, fallback_emoji="🔄"),
+                ]
+            ]
         )
-        return kb
 
     return None
 
 
-def send_demo_message(bot, chat_id, target: str):
+async def send_demo_message(bot: Bot, chat_id: int, target: str):
     kb = _get_demo_keyboard(target)
 
     if target == "card":
@@ -107,9 +129,9 @@ def send_demo_message(bot, chat_id, target: str):
             f"{EMOJI_LINK} Требует: base_plugin (1.0.0)\n\n"
             f"{EMOJI_FILE} Файл: <code>example_plugin.plugin</code>"
         )
-        sent = bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=kb)
+        sent = await bot.send_message(chat_id, text, reply_markup=kb)
         if check_and_update_from_message(sent) is False and kb:
-            bot.edit_message_reply_markup(chat_id, sent.message_id, reply_markup=_get_demo_keyboard(target))
+            await bot.edit_message_reply_markup(chat_id=chat_id, message_id=sent.message_id, reply_markup=_get_demo_keyboard(target))
 
     elif target == "approved":
         text = (
@@ -117,7 +139,7 @@ def send_demo_message(bot, chat_id, target: str):
             f"Ваш плагин <code>example_plugin</code> успешно добавлен в хранилище.\n"
             f"Коммит: <code>Add plugin: example_plugin v1.0.0</code>"
         )
-        sent = bot.send_message(chat_id, text, parse_mode="HTML")
+        sent = await bot.send_message(chat_id, text)
         check_and_update_from_message(sent)
 
     elif target == "rejected":
@@ -128,7 +150,7 @@ def send_demo_message(bot, chat_id, target: str):
             f"{EMOJI_USER} Отклонил: @admin\n\n"
             f"Если у вас есть вопросы, обратитесь к администраторам."
         )
-        sent = bot.send_message(chat_id, text, parse_mode="HTML")
+        sent = await bot.send_message(chat_id, text)
         check_and_update_from_message(sent)
 
     elif target == "delete":
@@ -139,9 +161,9 @@ def send_demo_message(bot, chat_id, target: str):
             f"{EMOJI_DEVELOPER} Автор: @developer\n\n"
             f"Вы уверены?"
         )
-        sent = bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=kb)
+        sent = await bot.send_message(chat_id, text, reply_markup=kb)
         if check_and_update_from_message(sent) is False and kb:
-            bot.edit_message_reply_markup(chat_id, sent.message_id, reply_markup=_get_demo_keyboard(target))
+            await bot.edit_message_reply_markup(chat_id=chat_id, message_id=sent.message_id, reply_markup=_get_demo_keyboard(target))
 
     elif target == "channel":
         text = (
@@ -161,9 +183,9 @@ def send_demo_message(bot, chat_id, target: str):
             f"Для работы требуются установленные зависимости и актуальная версия приложения. "
             f"Нажмите на блок цитаты, чтобы развернуть или свернуть полный текст описания.</blockquote>"
         )
-        sent = bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=kb)
+        sent = await bot.send_message(chat_id, text, reply_markup=kb)
         if check_and_update_from_message(sent) is False and kb:
-            bot.edit_message_reply_markup(chat_id, sent.message_id, reply_markup=_get_demo_keyboard(target))
+            await bot.edit_message_reply_markup(chat_id=chat_id, message_id=sent.message_id, reply_markup=_get_demo_keyboard(target))
 
     elif target == "status":
         text = (
@@ -171,7 +193,7 @@ def send_demo_message(bot, chat_id, target: str):
             f"• ID: <code>custom_theme</code> от @user1\n"
             f"• ID: <code>auto_translate</code> от @user2"
         )
-        sent = bot.send_message(chat_id, text, parse_mode="HTML")
+        sent = await bot.send_message(chat_id, text)
         check_and_update_from_message(sent)
 
     elif target == "all_emojis":
@@ -205,39 +227,45 @@ def send_demo_message(bot, chat_id, target: str):
             f"• Чат (текст): {EMOJI_MESSAGES_TEXT}\n"
             f"• Библиотека (текст): {EMOJI_LIBRARY_TEXT}"
         )
-        sent = bot.send_message(chat_id, text, parse_mode="HTML")
+        sent = await bot.send_message(chat_id, text)
         check_and_update_from_message(sent)
 
 
-def register_demo_handlers(bot):
-    @bot.message_handler(func=lambda m: m.text == "📋 Карточка заявки")
-    def handle_demo_card(message: types.Message):
-        send_demo_message(bot, message.chat.id, "card")
+@router.message(F.text == "📋 Карточка заявки")
+async def handle_demo_card(message: Message, bot: Bot):
+    await send_demo_message(bot, message.chat.id, "card")
 
-    @bot.message_handler(func=lambda m: m.text == "✅ Плагин одобрен")
-    def handle_demo_approved(message: types.Message):
-        send_demo_message(bot, message.chat.id, "approved")
 
-    @bot.message_handler(func=lambda m: m.text == "❌ Плагин отклонён")
-    def handle_demo_rejected(message: types.Message):
-        send_demo_message(bot, message.chat.id, "rejected")
+@router.message(F.text == "✅ Плагин одобрен")
+async def handle_demo_approved(message: Message, bot: Bot):
+    await send_demo_message(bot, message.chat.id, "approved")
 
-    @bot.message_handler(func=lambda m: m.text == "🗑 Удаление плагина")
-    def handle_demo_delete(message: types.Message):
-        send_demo_message(bot, message.chat.id, "delete")
 
-    @bot.message_handler(func=lambda m: m.text == "📢 Пост в канал")
-    def handle_demo_channel(message: types.Message):
-        send_demo_message(bot, message.chat.id, "channel")
+@router.message(F.text == "❌ Плагин отклонён")
+async def handle_demo_rejected(message: Message, bot: Bot):
+    await send_demo_message(bot, message.chat.id, "rejected")
 
-    @bot.message_handler(func=lambda m: m.text == "📊 Статус очереди")
-    def handle_demo_status(message: types.Message):
-        send_demo_message(bot, message.chat.id, "status")
 
-    @bot.message_handler(func=lambda m: m.text == "🎨 Все эмодзи")
-    def handle_demo_emojis(message: types.Message):
-        send_demo_message(bot, message.chat.id, "all_emojis")
+@router.message(F.text == "🗑 Удаление плагина")
+async def handle_demo_delete(message: Message, bot: Bot):
+    await send_demo_message(bot, message.chat.id, "delete")
 
-    @bot.callback_query_handler(func=lambda call: call.data == "test_msg_dummy")
-    def handle_dummy_callback(call: types.CallbackQuery):
-        bot.answer_callback_query(call.id, "✅ Тестовая кнопка нажата")
+
+@router.message(F.text == "📢 Пост в канал")
+async def handle_demo_channel(message: Message, bot: Bot):
+    await send_demo_message(bot, message.chat.id, "channel")
+
+
+@router.message(F.text == "📊 Статус очереди")
+async def handle_demo_status(message: Message, bot: Bot):
+    await send_demo_message(bot, message.chat.id, "status")
+
+
+@router.message(F.text == "🎨 Все эмодзи")
+async def handle_demo_emojis(message: Message, bot: Bot):
+    await send_demo_message(bot, message.chat.id, "all_emojis")
+
+
+@router.callback_query(F.data == "test_msg_dummy")
+async def handle_dummy_callback(call: CallbackQuery):
+    await call.answer("✅ Тестовая кнопка нажата")

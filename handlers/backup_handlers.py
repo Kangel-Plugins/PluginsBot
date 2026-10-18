@@ -1,9 +1,11 @@
 import os
 import time
-import threading
+import asyncio
 from pathlib import Path
 
-from telebot import types
+from aiogram import Router, Bot
+from aiogram.filters import Command
+from aiogram.types import Message, FSInputFile
 
 from PluginsBot.config import (
     BACKUP_ENABLED,
@@ -14,6 +16,8 @@ from PluginsBot.config import (
 )
 from PluginsBot.utils.backup_utils import build_backup
 from PluginsBot.utils.emoji_utils import e, ID_FOLDER, ID_CHECK, ID_WARNING
+
+router = Router()
 
 
 def _read_last_ts():
@@ -32,14 +36,14 @@ def _write_last_ts(ts):
         print(f"⚠️ Не удалось сохранить время бэкапа: {ex}")
 
 
-def send_backup(bot, chat_id=None):
+async def send_backup(bot: Bot, chat_id=None):
     cid = chat_id or BACKUP_CHAT_ID
     if not cid:
         print("⚠️ BACKUP_CHAT_ID не задан — бэкап не отправлен")
         return False
 
     try:
-        info = build_backup()
+        info = await asyncio.to_thread(build_backup)
     except Exception as ex:
         print(f"❌ Не удалось собрать бэкап: {ex}")
         return False
@@ -60,8 +64,8 @@ def send_backup(bot, chat_id=None):
 
     ok = False
     try:
-        with open(info["path"], "rb") as f:
-            bot.send_document(cid, f, caption=caption[:1000], parse_mode="HTML")
+        doc = FSInputFile(info["path"], filename=info["name"])
+        await bot.send_document(cid, doc, caption=caption[:1000])
         _write_last_ts(time.time())
         print(f"✅ Бэкап отправлен в {cid}: {info['name']}")
         ok = True
@@ -78,28 +82,29 @@ def send_backup(bot, chat_id=None):
     return ok
 
 
-def _scheduler(bot):
+async def backup_scheduler(bot: Bot):
     while True:
         try:
             interval = max(1.0, float(BACKUP_INTERVAL_HOURS)) * 3600
             if time.time() - _read_last_ts() >= interval:
-                send_backup(bot)
+                await send_backup(bot)
         except Exception as ex:
             print(f"❌ Ошибка планировщика бэкапа: {ex}")
-        time.sleep(600)
+        await asyncio.sleep(600)
 
 
-def register_backup_handlers(bot):
-    @bot.message_handler(commands=["backup"])
-    def handle_backup(message: types.Message):
-        if BACKUP_CHAT_ID and message.chat.id != BACKUP_CHAT_ID:
-            bot.reply_to(message, f"{e(ID_WARNING, '⛔')} Команда доступна только владельцу", parse_mode="HTML")
-            return
-        bot.reply_to(message, f"{e(ID_FOLDER, '🗄')} Собираю бэкап…", parse_mode="HTML")
-        ok = send_backup(bot, message.chat.id)
-        if not ok:
-            bot.reply_to(message, f"{e(ID_WARNING, '❌')} Не удалось отправить бэкап, смотри логи", parse_mode="HTML")
+@router.message(Command("backup"))
+async def handle_backup(message: Message, bot: Bot):
+    if BACKUP_CHAT_ID and message.chat.id != BACKUP_CHAT_ID:
+        await message.reply(f"{e(ID_WARNING, '⛔')} Команда доступна только владельцу")
+        return
+    await message.reply(f"{e(ID_FOLDER, '🗄')} Собираю бэкап…")
+    ok = await send_backup(bot, message.chat.id)
+    if not ok:
+        await message.reply(f"{e(ID_WARNING, '❌')} Не удалось отправить бэкап, смотри логи")
 
+
+def setup_backup_scheduler(bot: Bot):
     if not BACKUP_ENABLED:
         print("🗄 Автобэкап выключен (BACKUP_ENABLED=0)")
         return
@@ -108,5 +113,5 @@ def register_backup_handlers(bot):
         print("⚠️ BACKUP_CHAT_ID не задан — автобэкап выключен (доступна команда /backup в личке)")
         return
 
-    threading.Thread(target=_scheduler, args=(bot,), daemon=True).start()
+    asyncio.create_task(backup_scheduler(bot))
     print(f"🗄 Автобэкап включён: каждые {BACKUP_INTERVAL_HOURS} ч → {BACKUP_CHAT_ID}")

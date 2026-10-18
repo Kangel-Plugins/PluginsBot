@@ -1,4 +1,5 @@
 import sys
+import asyncio
 from pathlib import Path
 
 _dir = Path(__file__).resolve().parent
@@ -7,36 +8,52 @@ _parent = str(_dir.parent)
 if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
-import telebot
-from telebot import apihelper
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
 
 from PluginsBot.config import BOT_TOKEN, REPO_PATH, GROUP_ID, IS_DEMO
-from PluginsBot.handlers import register_command_handlers
-from PluginsBot.handlers import register_plugin_handlers
-from PluginsBot.handlers import register_approval_handlers
-from PluginsBot.handlers import register_demo_handlers
-from PluginsBot.handlers import register_backup_handlers
-
-apihelper.CONNECT_TIMEOUT = 500
-apihelper.READ_TIMEOUT = 500
-
-bot = telebot.TeleBot(BOT_TOKEN)
-
-pending_submissions = {}
-
-register_command_handlers(bot, pending_submissions)
-register_plugin_handlers(bot, pending_submissions)
-register_approval_handlers(bot, pending_submissions)
-register_backup_handlers(bot)
-
-if IS_DEMO:
-    register_demo_handlers(bot)
+from PluginsBot.handlers import (
+    command_router,
+    plugin_router,
+    approval_router,
+    demo_router,
+    backup_router,
+    setup_backup_scheduler,
+)
 
 
-if __name__ == "__main__":
-    print("🤖 Бот запущен и готов к работе...")
+async def main():
+    bot = Bot(
+        token=BOT_TOKEN,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
+    dp = Dispatcher()
+
+    pending_submissions = {}
+    dp["pending_submissions"] = pending_submissions
+
+    dp.include_router(command_router)
+    dp.include_router(plugin_router)
+    dp.include_router(approval_router)
+    dp.include_router(backup_router)
+
+    if IS_DEMO:
+        dp.include_router(demo_router)
+
+    setup_backup_scheduler(bot)
+
+    print("🤖 Бот запущен и готов к работе (aiogram 3)...")
     if IS_DEMO:
         print("🧪 Включен режим DEMO (--demo). Доступна клавиатура тестирования всех сообщений.")
     print(f"📁 Репозиторий: {REPO_PATH}")
     print(f"👥 Группа для заявок: {GROUP_ID}")
-    bot.infinity_polling()
+
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        print("🛑 Бот остановлен")
