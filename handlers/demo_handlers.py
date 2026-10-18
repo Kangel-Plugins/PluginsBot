@@ -1,6 +1,7 @@
 import html
 import re
 from aiogram import Router, F, Bot
+from aiogram.filters import Command
 from aiogram.types import (
     Message,
     CallbackQuery,
@@ -77,6 +78,7 @@ def demo_reply_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text="🎨 Все эмодзи")],
         ],
         resize_keyboard=True,
+        is_persistent=True,
     )
 
 
@@ -199,7 +201,10 @@ async def send_demo_message(bot: Bot, chat_id: int, target: str):
         )
         sent = await bot.send_message(chat_id, text, reply_markup=kb)
         if check_and_update_from_message(sent) is False and kb:
-            await bot.edit_message_reply_markup(chat_id=chat_id, message_id=sent.message_id, reply_markup=_get_demo_keyboard(target))
+            try:
+                await bot.edit_message_reply_markup(chat_id=chat_id, message_id=sent.message_id, reply_markup=_get_demo_keyboard(target))
+            except Exception:
+                pass
 
     elif target == "approved":
         text = (
@@ -231,7 +236,10 @@ async def send_demo_message(bot: Bot, chat_id: int, target: str):
         )
         sent = await bot.send_message(chat_id, text, reply_markup=kb)
         if check_and_update_from_message(sent) is False and kb:
-            await bot.edit_message_reply_markup(chat_id=chat_id, message_id=sent.message_id, reply_markup=_get_demo_keyboard(target))
+            try:
+                await bot.edit_message_reply_markup(chat_id=chat_id, message_id=sent.message_id, reply_markup=_get_demo_keyboard(target))
+            except Exception:
+                pass
 
     elif target == "channel":
         text = (
@@ -253,7 +261,10 @@ async def send_demo_message(bot: Bot, chat_id: int, target: str):
         )
         sent = await bot.send_message(chat_id, text, reply_markup=kb)
         if check_and_update_from_message(sent) is False and kb:
-            await bot.edit_message_reply_markup(chat_id=chat_id, message_id=sent.message_id, reply_markup=_get_demo_keyboard(target))
+            try:
+                await bot.edit_message_reply_markup(chat_id=chat_id, message_id=sent.message_id, reply_markup=_get_demo_keyboard(target))
+            except Exception:
+                pass
 
     elif target == "status":
         text = (
@@ -299,37 +310,46 @@ async def send_demo_message(bot: Bot, chat_id: int, target: str):
         check_and_update_from_message(sent)
 
 
-@router.message(F.text == "📋 Карточка заявки")
+@router.message(Command("demo"))
+async def handle_demo_command(message: Message):
+    sent = await message.reply(
+        f"{EMOJI_TOOLS} <b>Панель демо-режима</b>\n\nВыберите действие на клавиатуре ниже:",
+        reply_markup=demo_reply_keyboard(),
+    )
+    check_and_update_from_message(sent)
+
+
+@router.message(F.text.contains("Карточка заявки"))
 async def handle_demo_card(message: Message, bot: Bot):
     await send_demo_message(bot, message.chat.id, "card")
 
 
-@router.message(F.text == "✅ Плагин одобрен")
+@router.message(F.text.contains("Плагин одобрен"))
 async def handle_demo_approved(message: Message, bot: Bot):
     await send_demo_message(bot, message.chat.id, "approved")
 
 
-@router.message(F.text == "❌ Плагин отклонён")
+@router.message(F.text.contains("Плагин отклонён"))
 async def handle_demo_rejected(message: Message, bot: Bot):
     await send_demo_message(bot, message.chat.id, "rejected")
 
 
-@router.message(F.text == "🗑 Удаление плагина")
+@router.message(F.text.contains("Удаление плагина"))
 async def handle_demo_delete(message: Message, bot: Bot):
     await send_demo_message(bot, message.chat.id, "delete")
 
 
-@router.message(F.text == "📢 Пост в канал")
+@router.message(F.text.contains("Пост в канал"))
 async def handle_demo_channel(message: Message, bot: Bot):
     await send_demo_message(bot, message.chat.id, "channel")
 
 
-@router.message(F.text == "📊 Статус очереди")
+@router.message(F.text.contains("Статус очереди"))
 async def handle_demo_status(message: Message, bot: Bot):
     await send_demo_message(bot, message.chat.id, "status")
 
 
-@router.message(F.text == "🎨 Все эмодзи")
+@router.message(F.text.contains("Все эмодзи"))
 async def handle_demo_emojis(message: Message, bot: Bot):
     await send_demo_message(bot, message.chat.id, "all_emojis")
 

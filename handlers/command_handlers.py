@@ -80,10 +80,12 @@ def category_keyboard() -> InlineKeyboardMarkup:
 @router.message(Command("start"))
 async def handle_start(message: Message):
     if message.chat.type == "private":
-        reply_markup = None
         if IS_DEMO:
             from PluginsBot.handlers.demo_handlers import demo_reply_keyboard
             reply_markup = demo_reply_keyboard()
+        else:
+            from aiogram.types import ReplyKeyboardRemove
+            reply_markup = ReplyKeyboardRemove()
 
         sent = await message.reply(
             f"{EMOJI_WAVE} <b>Привет! Я бот для управления плагинами.</b>\n\n"
