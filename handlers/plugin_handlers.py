@@ -277,16 +277,16 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
         return
 
     try:
-        file_info = await bot.get_file(message.document.file_id)
+        downloaded_file = await download_plugin_file(bot, message.document)
 
         temp_dir = Path(tempfile.gettempdir()) / "plugins_bot_submissions"
         temp_dir.mkdir(parents=True, exist_ok=True)
         temp_path = temp_dir / f"{message.from_user.id}_{message.message_id}_{message.document.file_name}"
 
-        await bot.download_file(file_info.file_path, destination=temp_path)
+        with open(temp_path, "wb") as f:
+            f.write(downloaded_file)
 
-        with open(temp_path, "rb") as f:
-            header_bytes = f.read(4)
+        header_bytes = downloaded_file[:4]
 
         is_elyx = is_elyx_plugin(filename)
         if not is_elyx and header_bytes == b'PK\x03\x04':
