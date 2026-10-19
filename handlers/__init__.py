@@ -1,5 +1,14 @@
-from .command_handlers import register_command_handlers
-from .plugin_handlers import register_plugin_handlers
-from .approval_handlers import register_approval_handlers
-from .demo_handlers import register_demo_handlers
-from .backup_handlers import register_backup_handlers
+from .command_handlers import router as command_router
+from .plugin_handlers import router as plugin_router
+from .approval_handlers import router as approval_router
+from .demo_handlers import router as demo_router
+from .backup_handlers import router as backup_router, setup_backup_scheduler
+
+__all__ = [
+    "command_router",
+    "plugin_router",
+    "approval_router",
+    "demo_router",
+    "backup_router",
+    "setup_backup_scheduler",
+]

@@ -1,5 +1,6 @@
 import html
-from telebot import types
+from aiogram import Bot
+from aiogram.types import InlineKeyboardMarkup
 
 from PluginsBot.config import UPDATES_CHAT_ID, UPDATES_TOPIC_ID
 from PluginsBot.utils.emoji_utils import (
@@ -19,7 +20,16 @@ from PluginsBot.utils.emoji_utils import (
 )
 
 
-def send_plugin_update_notification(bot, plugin_id, plugin_name, author, version, is_new, status="plugin", description=None):
+async def send_plugin_update_notification(
+    bot: Bot,
+    plugin_id: str,
+    plugin_name: str,
+    author: str,
+    version: str,
+    is_new: bool,
+    status: str = "plugin",
+    description: str | None = None,
+):
     try:
         action = f"{EMOJI_PLUS} <b>Новый плагин</b>" if is_new else f"{EMOJI_REFRESH} <b>Обновление плагина</b>"
 
@@ -41,38 +51,36 @@ def send_plugin_update_notification(bot, plugin_id, plugin_name, author, version
                 desc_clean = desc_clean[:2997] + "..."
             notification_text += f"\n\n<blockquote expandable>{html.escape(desc_clean)}</blockquote>"
 
-        keyboard = types.InlineKeyboardMarkup(row_width=2)
-        keyboard.add(
-            make_inline_button(
-                "Установить",
-                url=f"tg://kpm_install?plugin={html.escape(str(plugin_id))}",
-                emoji_id=ID_DOWNLOAD,
-                fallback_emoji="⬇️",
-                style="primary",
-            ),
-            make_inline_button(
-                "Обновить список",
-                url="tg://kpm_list",
-                emoji_id=ID_REFRESH,
-                fallback_emoji="🔄",
-            ),
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    make_inline_button(
+                        "Установить",
+                        url=f"tg://kpm_install?plugin={html.escape(str(plugin_id))}",
+                        emoji_id=ID_DOWNLOAD,
+                        fallback_emoji="⬇️",
+                        style="primary",
+                    ),
+                    make_inline_button(
+                        "Обновить список",
+                        url="tg://kpm_list",
+                        emoji_id=ID_REFRESH,
+                        fallback_emoji="🔄",
+                    ),
+                ]
+            ]
         )
 
+        kwargs = {}
         if UPDATES_TOPIC_ID:
-            bot.send_message(
-                UPDATES_CHAT_ID,
-                notification_text,
-                parse_mode="HTML",
-                message_thread_id=UPDATES_TOPIC_ID,
-                reply_markup=keyboard,
-            )
-        else:
-            bot.send_message(
-                UPDATES_CHAT_ID,
-                notification_text,
-                parse_mode="HTML",
-                reply_markup=keyboard,
-            )
+            kwargs["message_thread_id"] = UPDATES_TOPIC_ID
+
+        await bot.send_message(
+            chat_id=UPDATES_CHAT_ID,
+            text=notification_text,
+            reply_markup=keyboard,
+            **kwargs,
+        )
 
         print(f"✅ Уведомление об обновлении плагина {plugin_id} отправлено в топик")
         return True
@@ -82,9 +90,9 @@ def send_plugin_update_notification(bot, plugin_id, plugin_name, author, version
         return False
 
 
-def send_plugin_delete_notification(bot, plugin_id, reason, admin_user):
+async def send_plugin_delete_notification(bot: Bot, plugin_id: str, reason: str, admin_user):
     try:
-        admin_name = admin_user.username or str(admin_user.id)
+        admin_name = getattr(admin_user, "username", None) or str(getattr(admin_user, "id", "Unknown"))
 
         notification_text = (
             f"{EMOJI_TRASH} <b>Плагин удалён</b>\n\n"
@@ -93,19 +101,15 @@ def send_plugin_delete_notification(bot, plugin_id, reason, admin_user):
             f"{EMOJI_USER} <b>Удалил:</b> @{html.escape(admin_name)}"
         )
 
+        kwargs = {}
         if UPDATES_TOPIC_ID:
-            bot.send_message(
-                UPDATES_CHAT_ID,
-                notification_text,
-                parse_mode="HTML",
-                message_thread_id=UPDATES_TOPIC_ID,
-            )
-        else:
-            bot.send_message(
-                UPDATES_CHAT_ID,
-                notification_text,
-                parse_mode="HTML",
-            )
+            kwargs["message_thread_id"] = UPDATES_TOPIC_ID
+
+        await bot.send_message(
+            chat_id=UPDATES_CHAT_ID,
+            text=notification_text,
+            **kwargs,
+        )
 
         print(f"✅ Уведомление об удалении плагина {plugin_id} отправлено в топик")
         return True

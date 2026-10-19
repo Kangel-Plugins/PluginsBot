@@ -1,9 +1,11 @@
+import io
 import math
 import asyncio
 import logging
-import threading
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
+
+from aiogram import Bot
 
 from PluginsBot.config import (
     BOT_TOKEN,
@@ -51,24 +53,7 @@ def format_size(bytes_num: int) -> str:
     return f"{bytes_num} Б"
 
 
-_mtproto_loop: Optional[asyncio.AbstractEventLoop] = None
-_mtproto_thread: Optional[threading.Thread] = None
 _mtproto_client = None
-_mtproto_lock = threading.Lock()
-
-
-def _get_or_create_loop() -> asyncio.AbstractEventLoop:
-    global _mtproto_loop, _mtproto_thread
-    with _mtproto_lock:
-        if _mtproto_loop is None or not _mtproto_loop.is_running():
-            _mtproto_loop = asyncio.new_event_loop()
-            _mtproto_thread = threading.Thread(
-                target=_mtproto_loop.run_forever,
-                daemon=True,
-                name="MTProtoBotLoop",
-            )
-            _mtproto_thread.start()
-        return _mtproto_loop
 
 
 async def _async_get_mtproto_client():
@@ -184,7 +169,7 @@ async def _stream_download_document(client, doc) -> bytes:
     return b"".join(chunks)
 
 
-async def _async_download_large_file(bot, file_id: str, max_size: int = ELYX_LIMIT) -> bytes:
+async def _async_download_large_file(bot: Bot, file_id: str, max_size: int = ELYX_LIMIT) -> bytes:
     client = await _async_get_mtproto_client()
     transfer_chat = FILE_TRANSFER_CHAT_ID or GROUP_ID
 
@@ -192,7 +177,7 @@ async def _async_download_large_file(bot, file_id: str, max_size: int = ELYX_LIM
         entity = await client.get_entity(transfer_chat)
     except Exception:
         try:
-            chat = bot.get_chat(transfer_chat)
+            chat = await bot.get_chat(transfer_chat)
             if chat.username:
                 entity = await client.get_entity(chat.username)
             else:
@@ -206,9 +191,9 @@ async def _async_download_large_file(bot, file_id: str, max_size: int = ELYX_LIM
 
     staging_msg = None
     try:
-        staging_msg = bot.send_document(
-            transfer_chat,
-            file_id,
+        staging_msg = await bot.send_document(
+            chat_id=transfer_chat,
+            document=file_id,
             disable_notification=True,
         )
         source = await client.get_messages(entity, ids=staging_msg.message_id)
@@ -249,12 +234,12 @@ async def _async_download_large_file(bot, file_id: str, max_size: int = ELYX_LIM
     finally:
         if staging_msg:
             try:
-                bot.delete_message(transfer_chat, staging_msg.message_id)
+                await bot.delete_message(chat_id=transfer_chat, message_id=staging_msg.message_id)
             except Exception:
                 pass
 
 
-def download_plugin_file(bot, document) -> bytes:
+async def download_plugin_file(bot: Bot, document) -> bytes:
     file_name = document.file_name or "plugin.plugin"
     file_size = getattr(document, "file_size", 0) or 0
     max_limit = plugin_file_limit(file_name)
@@ -267,8 +252,10 @@ def download_plugin_file(bot, document) -> bytes:
 
     if file_size and file_size <= BOT_DOWNLOAD_BYTES:
         try:
-            file_info = bot.get_file(document.file_id)
-            return bot.download_file(file_info.file_path)
+            file_info = await bot.get_file(document.file_id)
+            bio = io.BytesIO()
+            await bot.download_file(file_info.file_path, destination=bio)
+            return bio.getvalue()
         except Exception as exc:
             err_str = str(exc).lower()
             if "file is too big" not in err_str and "400" not in err_str:
@@ -282,9 +269,4 @@ def download_plugin_file(bot, document) -> bytes:
             f"Для быстрой загрузки файлов до 100 МБ укажите API_ID и API_HASH в .env"
         )
 
-    loop = _get_or_create_loop()
-    future = asyncio.run_coroutine_threadsafe(
-        _async_download_large_file(bot, document.file_id, max_limit),
-        loop,
-    )
-    return future.result(timeout=240)
+    return await _async_download_large_file(bot, document.file_id, max_limit)

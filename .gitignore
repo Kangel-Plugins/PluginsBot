@@ -4,3 +4,5 @@ __pycache__
 *.pem
 *.pem.enc
 data/
+*.egg-info/
+.venv/

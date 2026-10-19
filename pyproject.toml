@@ -1,0 +1,19 @@
+[project]
+name = "PluginsBot"
+version = "0.1.0"
+description = "Telegram moderation bot for KPM Store"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiogram>=3.14.0",
+    "python-dotenv>=1.0.0",
+    "cryptography>=43.0.0",
+    "telethon",
+    "pyzipper",
+]
+
+[project.scripts]
+bot = "PluginsBot.__main__:run"
+
+[tool.uv]
+package = false
