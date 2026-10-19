@@ -20,6 +20,7 @@ from PluginsBot.utils.plugin_utils import (
     PluginEncodingError,
 )
 from PluginsBot.utils.download_utils import (
+    download_plugin_file,
     is_elyx_plugin,
     plugin_extension,
 )
