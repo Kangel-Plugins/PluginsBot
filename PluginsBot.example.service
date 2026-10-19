@@ -1,0 +1,57 @@
+# PluginsBot — systemd-юнит для бота (aiogram 3 + uv).
+# Пример лежит в репозитории; установи так:
+#
+#   sudo cp PluginsBot.example.service /etc/systemd/system/PluginsBot.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now PluginsBot
+#
+# Логи:      journalctl -u PluginsBot -f
+# Обновление после git pull: просто рестарт, зависимости подтянутся сами:
+#   sudo systemctl restart PluginsBot
+
+[Unit]
+Description=PluginsBot — Telegram-бот модерации KPM Store (aiogram 3)
+After=network-online.target
+Wants=network-online.target
+# защита от бесконечного цикла рестартов: 10 падений за 5 минут = stop
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=exec
+User=ar34
+Group=ar34
+
+# ВАЖНО: каталогом ВЫШЕ пакета — `python -m PluginsBot` находит пакет только отсюда.
+# Сам бот в cwd ничего не пишет (все пути в config.py привязаны к __file__).
+WorkingDirectory=/home/ar34
+
+Environment=HOME=/home/ar34
+Environment=PATH=/home/ar34/.local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+# Демо-режим — раскомментируй:
+# Environment=BOT_DEMO=1
+# Если SSH-ключ с парольной фразой (git push через агент) — укажи сокет агента:
+# Environment=SSH_AUTH_SOCK=/run/user/1000/ssh-agent.socket
+
+# Ставим или обновляем пакеты перед запуском — одной командой:
+# uv сам создаёт/обновляет .venv и подтягивает самые свежие версии зависимостей
+# (эквивалент старого `uv pip install -U -r requirements.txt`, но через lock-файл).
+ExecStartPre=/usr/bin/uv sync --upgrade --project /home/ar34/PluginsBot
+
+# Прямой запуск из venv: uv в рантайме не нужен, код возврата честно уходит в systemd.
+# -u — небуферизованный вывод, чтобы логи в journald шли в реальном времени.
+ExecStart=/home/ar34/PluginsBot/.venv/bin/python -u -m PluginsBot
+
+Restart=on-failure
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=PluginsBot
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
