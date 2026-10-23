@@ -44,5 +44,13 @@
     "inline.type_plugin": "Плагин",
     "inline.type_library": "Библиотека",
     "inline.button_install": "Установить",
-    "inline.button_file": "Скачать файл"
+    "inline.button_about": "Че за KPM?",
+    "inline.button_refresh": "Обновить стор",
+    "inline.only_inline": "Скачать можно только из инлайн-карточки",
+    "inline.file_not_found": "Файл не найден в сторе",
+    "inline.download_error": "Не удалось отправить файл, попробуй ещё раз",
+    "inline.button_send_file": "Отправить как файл",
+    "inline.button_version": "Версия {version}",
+    "inline.button_back": "Назад",
+    "inline.start_bot_first": "Сначала напиши боту /start в личку"
 }

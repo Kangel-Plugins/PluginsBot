@@ -42,8 +42,9 @@ def check_and_update_from_message(message: Message) -> bool:
                     break
 
     _CHECKED_WITH_TELEGRAM = True
-    if USE_CUSTOM_EMOJI != has_custom:
-        USE_CUSTOM_EMOJI = has_custom
+    if has_custom and not USE_CUSTOM_EMOJI:
+        USE_CUSTOM_EMOJI = True
+        print("ℹ️ Кастомные эмодзи включены: Telegram вернул custom_emoji в ответе")
 
     return has_custom
 

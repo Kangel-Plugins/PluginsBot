@@ -44,5 +44,13 @@
     "inline.type_plugin": "Plugin",
     "inline.type_library": "Library",
     "inline.button_install": "Install",
-    "inline.button_file": "Download file"
+    "inline.button_about": "What is KPM?",
+    "inline.button_refresh": "Refresh store",
+    "inline.only_inline": "Download works only from an inline card",
+    "inline.file_not_found": "File not found in the store",
+    "inline.download_error": "Couldn't send the file, try again",
+    "inline.button_send_file": "Send as file",
+    "inline.button_version": "Version {version}",
+    "inline.button_back": "Back",
+    "inline.start_bot_first": "Send /start to the bot in private first"
 }

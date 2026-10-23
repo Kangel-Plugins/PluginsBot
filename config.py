@@ -38,6 +38,8 @@ GROUP_ID = int(os.getenv("GROUP_ID", "-1003243078083"))
 UPDATES_CHAT_ID = int(os.getenv("UPDATES_CHAT_ID", "-1002977846884"))
 UPDATES_TOPIC_ID = int(os.getenv("UPDATES_TOPIC_ID", "1270"))
 
+KPM_FORUM_URL = os.getenv("KPM_FORUM_URL", "https://t.me/KangelPluginsManager")
+
 STORE_RAW_URL = os.getenv(
     "STORE_RAW_URL",
     "https://git.kangel.xyz/KangelPlugins/Plugins-Store/raw/branch/main",

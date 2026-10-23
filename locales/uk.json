@@ -44,5 +44,13 @@
     "inline.type_plugin": "Плагін",
     "inline.type_library": "Бібліотека",
     "inline.button_install": "Встановити",
-    "inline.button_file": "Завантажити файл"
+    "inline.button_about": "Що таке KPM?",
+    "inline.button_refresh": "Оновити стор",
+    "inline.only_inline": "Завантажити можна лише з інлайн-картки",
+    "inline.file_not_found": "Файл не знайдено в сторі",
+    "inline.download_error": "Не вдалося надіслати файл, спробуй ще раз",
+    "inline.button_send_file": "Надіслати як файл",
+    "inline.button_version": "Версія {version}",
+    "inline.button_back": "Назад",
+    "inline.start_bot_first": "Спершу напиши боту /start в особисті"
 }

@@ -5,4 +5,5 @@ __pycache__
 *.pem.enc
 data/
 *.egg-info/
-.venv/
+.venv/
+Plugins-Store/

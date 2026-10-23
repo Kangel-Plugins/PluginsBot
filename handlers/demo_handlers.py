@@ -14,7 +14,10 @@ from PluginsBot.handlers.command_handlers import (
     CATEGORIES,
     get_category_label,
     get_category_name,
+    language_keyboard,
 )
+from PluginsBot.handlers.inline_handlers import build_inline_result
+from PluginsBot.utils.i18n import t
 from PluginsBot.utils.emoji_utils import (
     make_inline_button,
     check_and_update_from_message,
@@ -58,6 +61,18 @@ router = Router()
 
 demo_rejections: dict[int | str, dict | int] = {}
 
+DEMO_INLINE_ID = "example_plugin"
+DEMO_INLINE_ENTRY = {
+    "name": "Example Plugin",
+    "version": "1.0.0",
+    "author": "@developer",
+    "status": "utilities",
+    "min_version": "1.0.0",
+    "description": "Пример описания плагина для демонстрации карточки инлайн-поиска.",
+    "description_en": "Sample plugin description for the inline search card demo.",
+    "url": "https://example.com/Plugins/example_plugin.plugin",
+}
+
 
 def _get_admin_display(user) -> str:
     if getattr(user, "username", None):
@@ -74,6 +89,7 @@ def demo_reply_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text="📋 Карточка заявки"), KeyboardButton(text="✅ Плагин одобрен")],
             [KeyboardButton(text="❌ Плагин отклонён"), KeyboardButton(text="🗑 Удаление плагина")],
             [KeyboardButton(text="📢 Пост в канал"), KeyboardButton(text="📊 Статус очереди")],
+            [KeyboardButton(text="🔎 Инлайн-карточка"), KeyboardButton(text="🌐 Выбор языка")],
             [KeyboardButton(text="🎨 Все эмодзи")],
         ],
         resize_keyboard=True,
@@ -201,7 +217,7 @@ def _build_demo_card_text(selected_status_key: str | None = None) -> str:
     return text
 
 
-async def send_demo_message(bot: Bot, chat_id: int, target: str):
+async def send_demo_message(bot: Bot, chat_id: int, target: str, lang: str = "ru"):
     kb = _get_demo_keyboard(target)
 
     if target == "card":
@@ -282,6 +298,23 @@ async def send_demo_message(bot: Bot, chat_id: int, target: str):
         sent = await bot.send_message(chat_id, text)
         check_and_update_from_message(sent)
 
+    elif target == "inline":
+        result = build_inline_result(DEMO_INLINE_ID, DEMO_INLINE_ENTRY, lang)
+        sent = await bot.send_message(
+            chat_id,
+            result.input_message_content.message_text,
+            reply_markup=result.reply_markup,
+        )
+        check_and_update_from_message(sent)
+
+    elif target == "language":
+        sent = await bot.send_message(
+            chat_id,
+            f"{EMOJI_MESSAGES_TEXT} {t('lang.choose', lang)}",
+            reply_markup=language_keyboard(),
+        )
+        check_and_update_from_message(sent)
+
     elif target == "all_emojis":
         text = (
             f"{EMOJI_PALETTE} <b>Список всех эмодзи бота:</b>\n\n"
@@ -359,6 +392,16 @@ async def handle_demo_status(message: Message, bot: Bot):
 @router.message(F.text.contains("Все эмодзи"))
 async def handle_demo_emojis(message: Message, bot: Bot):
     await send_demo_message(bot, message.chat.id, "all_emojis")
+
+
+@router.message(F.text.contains("Инлайн-карточка"))
+async def handle_demo_inline(message: Message, bot: Bot, lang: str):
+    await send_demo_message(bot, message.chat.id, "inline", lang)
+
+
+@router.message(F.text.contains("Выбор языка"))
+async def handle_demo_language(message: Message, bot: Bot, lang: str):
+    await send_demo_message(bot, message.chat.id, "language", lang)
 
 
 # =========================================================================

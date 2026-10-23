@@ -48,22 +48,19 @@ nano .env
 
 ## Запуск
 
-Запуск бота осуществляется через `uv`:
+Проект не устанавливается как пакет (`package = false`), поэтому команда `bot` не создаётся. Запускай бота из **родительской** директории репозитория, как это делает systemd-юнит:
 
 ```bash
+cd ..   # директория, в которой лежит PluginsBot/
+
 # Обычный запуск:
-uv run bot
+uv run --project PluginsBot python -m PluginsBot
 
 # Демо-режим (тестирование вёрстки сообщений и интерактивных кнопок):
-uv run bot --demo
+uv run --project PluginsBot python -m PluginsBot --demo
 ```
 
-> **Совет**: Если вы активируете виртуальное окружение (`source .venv/bin/activate` на Linux/macOS или `.venv\Scripts\Activate.ps1` на Windows), бот доступен напрямую командой:
-> ```bash
-> bot
-> # или
-> bot --demo
-> ```
+> Для демо достаточно `BOT_TOKEN` в `.env`: стор, группа и бэкапы не нужны.
 
 ## Автозапуск через systemd
 

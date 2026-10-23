@@ -44,5 +44,13 @@
     "inline.type_plugin": "插件",
     "inline.type_library": "库",
     "inline.button_install": "安装",
-    "inline.button_file": "下载文件"
+    "inline.button_about": "KPM 是什么？",
+    "inline.button_refresh": "刷新商店",
+    "inline.only_inline": "只能在内联卡片中下载",
+    "inline.file_not_found": "商店中未找到该文件",
+    "inline.download_error": "无法发送文件，请重试",
+    "inline.button_send_file": "以文件形式发送",
+    "inline.button_version": "版本 {version}",
+    "inline.button_back": "返回",
+    "inline.start_bot_first": "请先在私聊中向机器人发送 /start"
 }
