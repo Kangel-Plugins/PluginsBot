@@ -19,8 +19,10 @@ from PluginsBot.handlers import (
     approval_router,
     demo_router,
     backup_router,
+    inline_router,
     setup_backup_scheduler,
 )
+from PluginsBot.utils.i18n import LocaleMiddleware
 
 
 async def main():
@@ -33,10 +35,13 @@ async def main():
     pending_submissions = {}
     dp["pending_submissions"] = pending_submissions
 
+    dp.update.outer_middleware(LocaleMiddleware())
+
     dp.include_router(command_router)
     dp.include_router(plugin_router)
     dp.include_router(approval_router)
     dp.include_router(backup_router)
+    dp.include_router(inline_router)
 
     if IS_DEMO:
         dp.include_router(demo_router)

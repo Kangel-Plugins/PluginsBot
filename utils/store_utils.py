@@ -406,6 +406,50 @@ def add_plugin_to_store_json(plugin_id: str, url: str, dependencies: List[str] =
         return False
 
 
+def get_localized_description(entry: Dict, lang: str) -> str:
+    return str(entry.get(f"description_{lang}") or entry.get("description") or "").strip()
+
+
+def search_store(query: str, lang: str) -> List[Tuple[str, Dict]]:
+    try:
+        with open(STORE_JSON_FILE, "r", encoding="utf-8") as f:
+            store_data = json.load(f)
+    except Exception:
+        return []
+
+    needle = (query or "").strip().lower()
+    scored = []
+    for plugin_id, entry in store_data.items():
+        if not isinstance(entry, dict):
+            continue
+        if not needle:
+            scored.append((0, plugin_id, entry))
+            continue
+
+        score = 0
+        pid = plugin_id.lower()
+        name = str(entry.get("name") or "").lower()
+        author = str(entry.get("author") or "").lower()
+        desc = get_localized_description(entry, lang).lower()
+
+        if pid == needle:
+            score += 100
+        elif needle in pid:
+            score += 50
+        if needle in name:
+            score += 30
+        if needle in author:
+            score += 10
+        if needle in desc:
+            score += 5
+
+        if score:
+            scored.append((score, plugin_id, entry))
+
+    scored.sort(key=lambda item: (-item[0], str(item[2].get("name") or item[1]).lower()))
+    return [(plugin_id, entry) for _, plugin_id, entry in scored]
+
+
 def is_plugin_in_store(plugin_id: str) -> Tuple[bool, Optional[str]]:
     try:
         if not os.path.exists(STORE_JSON_FILE):

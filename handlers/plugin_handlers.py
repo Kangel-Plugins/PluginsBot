@@ -24,6 +24,7 @@ from PluginsBot.utils.download_utils import (
     plugin_extension,
 )
 from PluginsBot.utils.store_utils import is_plugin_in_store
+from PluginsBot.utils.i18n import t
 from PluginsBot.utils.emoji_utils import (
     make_inline_button,
     check_and_update_from_message,
@@ -217,10 +218,10 @@ async def handle_status_selection(call: CallbackQuery, pending_submissions: dict
 
 
 @router.callback_query(F.data.startswith("cat_"))
-async def handle_category_selection(call: CallbackQuery, bot: Bot, pending_submissions: dict):
+async def handle_category_selection(call: CallbackQuery, bot: Bot, pending_submissions: dict, lang: str):
     user_id = call.from_user.id
     if user_id not in pending_file_data:
-        await call.answer("❌ Файл не найден, отправьте плагин заново", show_alert=True)
+        await call.answer(t("plugin.file_not_found", lang), show_alert=True)
         return
 
     category = call.data[len("cat_"):]
@@ -228,17 +229,19 @@ async def handle_category_selection(call: CallbackQuery, bot: Bot, pending_submi
 
     await _send_to_group(bot, pending_submissions, user_id)
 
-    msg_text = f"{EMOJI_CHECK} Категория: <b>{get_category_label(category)}</b>\n\nЗаявка отправлена в группу на рассмотрение."
+    msg_text = f"{EMOJI_CHECK} " + t(
+        "plugin.category_set", lang, category=get_category_label(category, lang)
+    )
     try:
         await call.message.edit_text(msg_text)
     except Exception:
         await call.message.answer(msg_text)
 
-    await call.answer("✅ Заявка отправлена!")
+    await call.answer(t("plugin.sent", lang))
 
 
 @router.message(F.document)
-async def handle_plugin_submission(message: Message, bot: Bot, pending_submissions: dict):
+async def handle_plugin_submission(message: Message, bot: Bot, pending_submissions: dict, lang: str):
     is_private = message.chat.type == "private"
     is_group = message.chat.id == GROUP_ID
     is_updates = message.chat.id == UPDATES_CHAT_ID
@@ -248,7 +251,7 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
 
     if not is_private and not is_group:
         await message.reply(
-            f"{EMOJI_CROSS} Отправь плагин мне в личные сообщения (@KPMAppealBot)"
+            f"{EMOJI_CROSS} {t('plugin.use_dm', lang)}"
         )
         return
 
@@ -257,13 +260,13 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
             chat_member = await bot.get_chat_member(UPDATES_CHAT_ID, message.from_user.id)
             if chat_member.status in ("left", "kicked", "restricted"):
                 await message.reply(
-                    f"{EMOJI_CROSS} Для отправки плагинов необходимо зайти в @KangelPluginsManager"
+                    f"{EMOJI_CROSS} {t('plugin.not_in_channel', lang)}"
                 )
                 return
         except Exception as e:
             print(f"⚠️ Ошибка при проверке членства в чате: {e}")
             await message.reply(
-                f"{EMOJI_CROSS} Для отправки плагинов необходимо зайти в @KangelPluginsManager"
+                f"{EMOJI_CROSS} {t('plugin.not_in_channel', lang)}"
             )
             return
 
@@ -271,10 +274,7 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
     ext = plugin_extension(filename)
     if not ext:
         await message.reply(
-            f"{EMOJI_CROSS} Отправь файл плагина (.plugin, .eaf, .elyx, .zip, .eaf.zip, .elyx.zip)\n\n"
-            f"<b>Лимиты размера:</b>\n"
-            f"• .plugin — до 8 МБ\n"
-            f"• Elyx (.eaf / .elyx / .zip) — до 100 МБ"
+            f"{EMOJI_CROSS} {t('plugin.bad_extension', lang)}"
         )
         return
 
@@ -303,9 +303,7 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
                 except Exception:
                     pass
                 await message.reply(
-                    f"{EMOJI_CROSS} Внутри архива есть файл, сохранённый не в UTF-8.\n\n"
-                    f"Пересохраните <b>metainfo</b>, <b>refmap</b> и файлы локализации в UTF-8 "
-                    f"(в PyCharm/VS Code: File Encoding → UTF-8) и отправьте заново."
+                    f"{EMOJI_CROSS} {t('plugin.elyx_encoding', lang)}"
                 )
                 return
             dependencies = []
@@ -319,8 +317,7 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
                 except Exception:
                     pass
                 await message.reply(
-                    f"{EMOJI_CROSS} Файл плагина сохранён не в UTF-8.\n\n"
-                    f"Пересохраните его в UTF-8 и отправьте заново."
+                    f"{EMOJI_CROSS} {t('plugin.file_encoding', lang)}"
                 )
                 return
             metadata = extract_plugin_metadata(plugin_content)
@@ -331,7 +328,7 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
                 os.remove(temp_path)
             except Exception:
                 pass
-            await message.reply(f"{EMOJI_CROSS} Не найден id в плагине")
+            await message.reply(f"{EMOJI_CROSS} {t('plugin.no_id', lang)}")
             return
 
         exists, current_status = is_plugin_in_store(metadata.get("id"))
@@ -357,19 +354,20 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
             await _send_to_group(bot, pending_submissions, message.from_user.id)
             if is_private:
                 await message.reply(
-                    f"{EMOJI_CHECK} Плагин обновлён! Категория: <b>{get_category_label(current_status)}</b>\n"
-                    f"Заявка отправлена в группу на рассмотрение.",
+                    f"{EMOJI_CHECK} " + t(
+                        "plugin.updated", lang, category=get_category_label(current_status, lang)
+                    ),
                 )
         else:
             await message.reply(
-                f"{EMOJI_PACKAGE} <b>Плагин:</b> <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
-                f"{EMOJI_MEMO} <b>Название:</b> {html.escape(str(metadata.get('name', 'N/A')))}\n"
-                f"{EMOJI_DEVELOPER} <b>Автор:</b> {html.escape(str(metadata.get('author', 'N/A')))}\n"
-                f"{EMOJI_PIN} <b>Версия:</b> {html.escape(str(metadata.get('version', 'N/A')))}\n\n"
-                f"Выбери категорию плагина:",
-                reply_markup=category_keyboard(),
+                f"{EMOJI_PACKAGE} <b>{t('label.plugin', lang)}</b> <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
+                f"{EMOJI_MEMO} <b>{t('label.name', lang)}</b> {html.escape(str(metadata.get('name', 'N/A')))}\n"
+                f"{EMOJI_DEVELOPER} <b>{t('label.author', lang)}</b> {html.escape(str(metadata.get('author', 'N/A')))}\n"
+                f"{EMOJI_PIN} <b>{t('label.version', lang)}</b> {html.escape(str(metadata.get('version', 'N/A')))}\n\n"
+                f"{t('plugin.choose_category', lang)}",
+                reply_markup=category_keyboard(lang),
             )
 
     except Exception as e:
         print(f"Ошибка при обработке плагина: {e}")
-        await message.reply(f"{EMOJI_CROSS} Ошибка при обработке файла: {html.escape(str(e))}")
+        await message.reply(f"{EMOJI_CROSS} {t('plugin.error', lang, error=html.escape(str(e)))}")

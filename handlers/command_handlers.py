@@ -2,9 +2,10 @@ import html
 import asyncio
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 from PluginsBot.config import GROUP_ID, IS_DEMO
+from PluginsBot.utils.i18n import t, set_user_lang, SUPPORTED_LANGS, LANG_NAMES
 from PluginsBot.utils.emoji_utils import (
     e,
     make_inline_button,
@@ -45,25 +46,25 @@ CATEGORIES = {
 }
 
 
-def get_category_label(key: str) -> str:
+def get_category_label(key: str, lang: str = "ru") -> str:
     if key in CATEGORIES:
-        name, fallback, emoji_id = CATEGORIES[key]
-        return f"{e(emoji_id, fallback)} {name}"
+        _, fallback, emoji_id = CATEGORIES[key]
+        return f"{e(emoji_id, fallback)} {t(f'cat.{key}', lang)}"
     return key
 
 
-def get_category_name(key: str) -> str:
+def get_category_name(key: str, lang: str = "ru") -> str:
     if key in CATEGORIES:
-        return CATEGORIES[key][0]
+        return t(f"cat.{key}", lang)
     return key
 
 
-def category_keyboard() -> InlineKeyboardMarkup:
+def category_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     rows = []
     current_row = []
-    for key, (name, fallback, emoji_id) in CATEGORIES.items():
+    for key, (_, fallback, emoji_id) in CATEGORIES.items():
         btn = make_inline_button(
-            text=name,
+            text=t(f"cat.{key}", lang),
             callback_data=f"cat_{key}",
             emoji_id=emoji_id,
             fallback_emoji=fallback,
@@ -77,8 +78,16 @@ def category_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def language_keyboard() -> InlineKeyboardMarkup:
+    buttons = [
+        InlineKeyboardButton(text=LANG_NAMES[code], callback_data=f"lang_{code}")
+        for code in SUPPORTED_LANGS
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=[buttons[:2], buttons[2:]])
+
+
 @router.message(Command("start"))
-async def handle_start(message: Message):
+async def handle_start(message: Message, lang: str):
     if message.chat.type == "private":
         if IS_DEMO:
             from PluginsBot.handlers.demo_handlers import demo_reply_keyboard
@@ -88,23 +97,50 @@ async def handle_start(message: Message):
             reply_markup = ReplyKeyboardRemove()
 
         sent = await message.reply(
-            f"{EMOJI_WAVE} <b>Привет! Я бот для управления плагинами.</b>\n\n"
-            f"Отправь мне файл плагина, и я помогу добавить его в репозиторий.\n\n"
-            f"{EMOJI_PACKAGE} <b>Поддерживаемые форматы:</b>\n"
-            f"• Python плагины: <code>.plugin</code> (до 8 МБ)\n"
-            f"• Elyx архивы: <code>.elyx</code>, <code>.eaf</code>, <code>.zip</code> (до 100 МБ)\n\n"
-            f"{EMOJI_MEMO} <b>Метаданные плагина:</b>\n"
-            f"• <code>__id__</code> = <code>\"plugin_id\"</code> (или <code>id</code> в Elyx)\n"
-            f"• <code>__name__</code> = <code>\"Название\"</code>\n"
-            f"• <code>__version__</code> = <code>\"1.0.0\"</code>\n"
-            f"• <code>__author__</code> = <code>\"@username\"</code>\n"
-            f"• <code>__description__</code> = <code>\"Описание плагина\"</code>\n"
-            f"• <code>__app_version__</code> = <code>\"&gt;=12.5.1\"</code>\n"
-            f"• <code>__requirements__</code> = <code>\"requests, PyYAML\"</code> (опционально)\n\n"
-            f"Зависимости и метаданные определяются автоматически.",
+            f"{EMOJI_WAVE} {t('start.title', lang)}\n\n"
+            f"{t('start.intro', lang)}\n\n"
+            f"{EMOJI_PACKAGE} {t('start.formats_title', lang)}\n"
+            f"{t('start.format_plugin', lang)}\n"
+            f"{t('start.format_elyx', lang)}\n\n"
+            f"{EMOJI_MEMO} {t('start.meta_title', lang)}\n"
+            f"{t('start.meta_id', lang)}\n"
+            f"{t('start.meta_name', lang)}\n"
+            f"{t('start.meta_version', lang)}\n"
+            f"{t('start.meta_author', lang)}\n"
+            f"{t('start.meta_description', lang)}\n"
+            f"{t('start.meta_app_version', lang)}\n"
+            f"{t('start.meta_requirements', lang)}\n\n"
+            f"{t('start.auto', lang)}\n\n"
+            f"{t('start.inline_hint', lang)}",
             reply_markup=reply_markup,
         )
         check_and_update_from_message(sent)
+
+
+@router.message(Command("language"))
+async def handle_language(message: Message, lang: str):
+    if message.chat.type != "private":
+        return
+    await message.reply(
+        f"{EMOJI_MESSAGES_TEXT} {t('lang.choose', lang)}",
+        reply_markup=language_keyboard(),
+    )
+
+
+@router.callback_query(F.data.startswith("lang_"))
+async def handle_language_selection(call: CallbackQuery):
+    new_lang = call.data[len("lang_"):]
+    if new_lang not in SUPPORTED_LANGS:
+        await call.answer()
+        return
+
+    set_user_lang(call.from_user.id, new_lang)
+    text = t("lang.changed", new_lang, name=LANG_NAMES[new_lang])
+    try:
+        await call.message.edit_text(text, reply_markup=language_keyboard())
+    except Exception:
+        await call.message.answer(text)
+    await call.answer()
 
 
 @router.message(Command("status"))
