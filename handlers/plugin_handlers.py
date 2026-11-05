@@ -24,7 +24,7 @@ from PluginsBot.utils.download_utils import (
     is_elyx_plugin,
     plugin_extension,
 )
-from PluginsBot.utils.store_utils import is_plugin_in_store
+from PluginsBot.utils.store_utils import is_plugin_in_store, get_plugin_entry, compare_versions
 from PluginsBot.utils.emoji_utils import (
     make_inline_button,
     check_and_update_from_message,
@@ -108,8 +108,14 @@ async def _send_to_group(bot: Bot, pending_submissions: dict, user_id: int):
         f"{EMOJI_PACKAGE} ID: <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
         f"{EMOJI_MEMO} Название: {html.escape(str(metadata.get('name', 'N/A')))}\n"
         f"{EMOJI_DEVELOPER} Автор: {html.escape(str(metadata.get('author', 'N/A')))}\n"
-        f"{EMOJI_PIN} Версия: {html.escape(str(metadata.get('version', 'N/A')))}\n"
     )
+
+    old_version = data.get("old_version")
+    new_version_str = html.escape(str(metadata.get('version', 'N/A')))
+    if data.get('exists') and old_version:
+        info_text += f"{EMOJI_PIN} Версия: <code>{html.escape(str(old_version))}</code> → <b>{new_version_str}</b>\n"
+    else:
+        info_text += f"{EMOJI_PIN} Версия: <b>{new_version_str}</b>\n"
 
     min_version = metadata.get('min_version')
     if min_version:
@@ -240,6 +246,20 @@ async def handle_category_selection(call: CallbackQuery, bot: Bot, pending_submi
 
 @router.message(F.document)
 async def handle_plugin_submission(message: Message, bot: Bot, pending_submissions: dict):
+    if not message.document or not message.from_user:
+        return
+
+    if message.animation:
+        return
+
+    if getattr(message.document, "mime_type", None) in ("image/gif", "video/mp4"):
+        return
+
+    filename = message.document.file_name or ""
+    ext = plugin_extension(filename)
+    if not ext:
+        return
+
     is_private = message.chat.type == "private"
     is_group = message.chat.id == GROUP_ID
     is_updates = message.chat.id == UPDATES_CHAT_ID
@@ -267,17 +287,6 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
                 f"{EMOJI_CROSS} Для отправки плагинов необходимо зайти в @KangelPluginsManager"
             )
             return
-
-    filename = message.document.file_name or ""
-    ext = plugin_extension(filename)
-    if not ext:
-        await message.reply(
-            f"{EMOJI_CROSS} Отправь файл плагина (.plugin, .eaf, .elyx, .zip, .eaf.zip, .elyx.zip)\n\n"
-            f"<b>Лимиты размера:</b>\n"
-            f"• .plugin — до 8 МБ\n"
-            f"• Elyx (.eaf / .elyx / .zip) — до 100 МБ"
-        )
-        return
 
     try:
         downloaded_file = await download_plugin_file(bot, message.document)
@@ -332,10 +341,45 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
                 os.remove(temp_path)
             except Exception:
                 pass
-            await message.reply(f"{EMOJI_CROSS} Не найден id в плагине")
+            if is_private:
+                await message.reply(f"{EMOJI_CROSS} Не найден id в плагине")
             return
 
-        exists, current_status = is_plugin_in_store(metadata.get("id"))
+        plugin_id = str(metadata["id"])
+        exists, current_status = is_plugin_in_store(plugin_id)
+        current_entry = get_plugin_entry(plugin_id) if exists else None
+        current_version = current_entry.get("version") if current_entry else None
+        new_version = metadata.get("version") or "1.0.0"
+
+        if exists and current_version:
+            cmp = compare_versions(new_version, current_version)
+            if cmp <= 0:
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
+                if cmp == 0:
+                    err_msg = (
+                        f"{EMOJI_CROSS} Версия плагина (<b>{html.escape(str(new_version))}</b>) "
+                        f"совпадает с текущей версией в репозитории.\n\n"
+                        f"Пожалуйста, увеличьте версию плагина перед отправкой."
+                    )
+                else:
+                    err_msg = (
+                        f"{EMOJI_CROSS} Версия плагина (<b>{html.escape(str(new_version))}</b>) "
+                        f"ниже текущей в репозитории (<b>{html.escape(str(current_version))}</b>).\n\n"
+                        f"Пожалуйста, укажите актуальную версию плагина."
+                    )
+                await message.reply(err_msg)
+                return
+
+        if message.from_user.id in pending_file_data:
+            old_temp = pending_file_data[message.from_user.id].get("temp_path")
+            if old_temp and os.path.exists(old_temp):
+                try:
+                    os.remove(old_temp)
+                except Exception:
+                    pass
 
         submission_data = {
             "user_id": message.from_user.id,
@@ -349,6 +393,7 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
             "dependencies": dependencies,
             "submission_id": message.message_id,
             "exists": exists,
+            "old_version": current_version if exists else None,
             "status": current_status if exists else None,
         }
 
@@ -356,9 +401,10 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
 
         if is_group or (exists and current_status):
             await _send_to_group(bot, pending_submissions, message.from_user.id)
-            if is_private:
+            if is_private and current_status:
+                ver_info = f" (<code>{html.escape(str(current_version))}</code> → <b>{html.escape(str(new_version))}</b>)" if current_version else ""
                 await message.reply(
-                    f"{EMOJI_CHECK} Плагин обновлён! Категория: <b>{get_category_label(current_status)}</b>\n"
+                    f"{EMOJI_CHECK} Плагин обновлён!{ver_info} Категория: <b>{get_category_label(current_status)}</b>\n"
                     f"Заявка отправлена в группу на рассмотрение.",
                 )
         else:

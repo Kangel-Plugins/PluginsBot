@@ -16,7 +16,12 @@ from PluginsBot.config import (
     PRIVATE_KEY_PATH,
     STORE_RAW_URL,
 )
-from PluginsBot.utils.store_utils import add_plugin_to_store_json, get_plugin_filename_by_id
+from PluginsBot.utils.store_utils import (
+    add_plugin_to_store_json,
+    get_plugin_filename_by_id,
+    get_plugin_entry,
+    compare_versions,
+)
 from PluginsBot.utils.git_utils import commit_and_push
 from PluginsBot.utils.notification_utils import send_plugin_update_notification
 from PluginsBot.utils.crypto_utils import load_private_key, sign_plugin
@@ -159,6 +164,20 @@ async def handle_approve(call: CallbackQuery, bot: Bot, pending_submissions: dic
     metadata = submission["metadata"]
     plugin_id = metadata.get("id")
     dependencies = submission["dependencies"]
+
+    existing_entry = get_plugin_entry(plugin_id)
+    if existing_entry:
+        current_version = existing_entry.get("version")
+        new_version = metadata.get("version") or "1.0.0"
+        if current_version:
+            cmp = compare_versions(new_version, current_version)
+            if cmp <= 0:
+                if cmp == 0:
+                    err_msg = f"❌ Версия плагина ({new_version}) совпадает с текущей в репозитории ({current_version})!"
+                else:
+                    err_msg = f"❌ Версия плагина ({new_version}) ниже текущей в репозитории ({current_version})!"
+                await call.answer(err_msg, show_alert=True)
+                return
 
     try:
         plugin_filename = submission.get("plugin_file", f"{plugin_id}.plugin")
@@ -530,8 +549,14 @@ def _build_submission_caption(metadata, submission):
         f"{EMOJI_PACKAGE} ID: <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
         f"{EMOJI_MEMO} Название: {html.escape(str(metadata.get('name', 'N/A')))}\n"
         f"{EMOJI_DEVELOPER} Автор: {html.escape(str(metadata.get('author', 'N/A')))}\n"
-        f"{EMOJI_PIN} Версия: {html.escape(str(metadata.get('version', 'N/A')))}\n"
     )
+
+    old_version = submission.get("old_version")
+    new_version_str = html.escape(str(metadata.get('version', 'N/A')))
+    if exists and old_version:
+        info_text += f"{EMOJI_PIN} Версия: <code>{html.escape(str(old_version))}</code> → <b>{new_version_str}</b>\n"
+    else:
+        info_text += f"{EMOJI_PIN} Версия: <b>{new_version_str}</b>\n"
 
     min_version = metadata.get('min_version')
     if min_version:
