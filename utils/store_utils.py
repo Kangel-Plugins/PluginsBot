@@ -5,6 +5,12 @@ import re
 import hashlib
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    from packaging.version import parse as _parse_version, InvalidVersion as _InvalidVersion
+except ImportError:
+    _parse_version = None
+    _InvalidVersion = Exception
+
 from PluginsBot.config import STORE_JSON_FILE, PLUGINS_DIR, KNOWN_LIBS
 
 
@@ -124,6 +130,80 @@ def normalize_min_version(version_expr: Optional[str]) -> Optional[str]:
         return match.group(1)
 
     return version_expr or None
+
+
+def clean_version_str(v: Optional[str]) -> str:
+    if not v:
+        return "0.0.0"
+    s = str(v).strip()
+    s = re.sub(r'\[.*?\]', '', s)
+    s = re.sub(r'\(.*?\)', '', s)
+    s = s.strip()
+    return s or "0.0.0"
+
+
+def compare_versions(v1: Optional[str], v2: Optional[str]) -> int:
+    """
+    Compares two version strings.
+    Returns:
+        1 if v1 > v2
+       -1 if v1 < v2
+        0 if v1 == v2
+    """
+    s1 = str(v1 or "").strip()
+    s2 = str(v2 or "").strip()
+    if s1 == s2:
+        return 0
+    if not s1:
+        return -1
+    if not s2:
+        return 1
+
+    c1 = clean_version_str(s1)
+    c2 = clean_version_str(s2)
+
+    if _parse_version is not None:
+        try:
+            pv1 = _parse_version(c1)
+            pv2 = _parse_version(c2)
+            if pv1 > pv2:
+                return 1
+            elif pv1 < pv2:
+                return -1
+            else:
+                return 0
+        except (_InvalidVersion, Exception):
+            pass
+
+    def split_parts(s: str) -> List[Tuple[int, Any]]:
+        parts = []
+        for token in re.split(r'([0-9]+)', s):
+            if not token:
+                continue
+            if token.isdigit():
+                parts.append((0, int(token)))
+            else:
+                cleaned = token.lower().strip('.-_ ')
+                if cleaned:
+                    parts.append((1, cleaned))
+        return parts
+
+    parts1 = split_parts(c1)
+    parts2 = split_parts(c2)
+
+    for p1, p2 in zip(parts1, parts2):
+        if p1 != p2:
+            if p1[0] == 0 and p2[0] == 0:
+                return 1 if p1[1] > p2[1] else -1
+            if p1[0] != p2[0]:
+                return 1 if p1[0] == 0 else -1
+            return 1 if p1[1] > p2[1] else -1
+
+    if len(parts1) > len(parts2):
+        return 1
+    elif len(parts1) < len(parts2):
+        return -1
+    return 0
 
 
 def normalize_requirements(requirements_value: Any) -> List[str]:
