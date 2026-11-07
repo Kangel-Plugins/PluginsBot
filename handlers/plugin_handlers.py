@@ -394,7 +394,7 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
             "is_elyx": is_elyx,
             "metadata": metadata,
             "dependencies": dependencies,
-            "submission_id": message.message_id,
+            "submission_id": message.from_user.id * 1_000_000_000 + message.message_id,
             "exists": exists,
             "old_version": current_version if exists else None,
             "status": current_status if exists else None,
