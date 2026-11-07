@@ -423,3 +423,9 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
     except Exception as e:
         print(f"Ошибка при обработке плагина: {e}")
         await message.reply(f"{EMOJI_CROSS} Ошибка при обработке файла: {html.escape(str(e))}")
+
+
+@router.message(F.animation)
+async def ignore_group_animation(message: Message):
+    if message.chat.id == GROUP_ID:
+        return
