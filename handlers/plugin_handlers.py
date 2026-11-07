@@ -249,6 +249,13 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
     if not message.document or not message.from_user:
         return
 
+    is_private = message.chat.type == "private"
+    is_group = message.chat.id == GROUP_ID
+    is_updates = message.chat.id == UPDATES_CHAT_ID
+
+    if is_updates or (not is_private and is_group and not plugin_extension(message.document.file_name or "")):
+        return
+
     if message.animation:
         return
 
@@ -259,10 +266,6 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
     ext = plugin_extension(filename)
     if not ext:
         return
-
-    is_private = message.chat.type == "private"
-    is_group = message.chat.id == GROUP_ID
-    is_updates = message.chat.id == UPDATES_CHAT_ID
 
     if is_updates:
         return
