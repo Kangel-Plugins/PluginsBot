@@ -42,10 +42,10 @@ def check_and_update_from_message(message: Message) -> bool:
                     break
 
     _CHECKED_WITH_TELEGRAM = True
-    if USE_CUSTOM_EMOJI != has_custom:
-        USE_CUSTOM_EMOJI = has_custom
+    if has_custom:
+        USE_CUSTOM_EMOJI = True
 
-    return has_custom
+    return has_custom or USE_CUSTOM_EMOJI
 
 
 ID_CHECK = "5233491489253793257"
