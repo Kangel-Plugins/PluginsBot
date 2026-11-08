@@ -173,10 +173,11 @@ async def handle_approve(call: CallbackQuery, bot: Bot, pending_submissions: dic
             cmp = compare_versions(new_version, current_version)
             if cmp <= 0:
                 if cmp == 0:
-                    err_msg = f"❌ Версия плагина ({new_version}) совпадает с текущей в репозитории ({current_version})!"
+                    err_msg = f"{EMOJI_CROSS} Версия плагина ({html.escape(str(new_version))}) совпадает с текущей в репозитории ({html.escape(str(current_version))})!"
                 else:
-                    err_msg = f"❌ Версия плагина ({new_version}) ниже текущей в репозитории ({current_version})!"
-                await call.answer(err_msg, show_alert=True)
+                    err_msg = f"{EMOJI_CROSS} Версия плагина ({html.escape(str(new_version))}) ниже текущей в репозитории ({html.escape(str(current_version))})!"
+                await call.answer()
+                await call.message.answer(err_msg)
                 return
 
     try:
