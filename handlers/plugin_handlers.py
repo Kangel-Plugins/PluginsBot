@@ -421,6 +421,7 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
 
         submission_data = {
             "user_id": message.from_user.id,
+            "chat_id": message.chat.id,
             "username": message.from_user.username or "Unknown",
             "temp_path": str(temp_path),
             "plugin_file": message.document.file_name,
@@ -438,9 +439,7 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
 
         pending_file_data[message.from_user.id] = submission_data
 
-        if is_group:
-            await _send_to_group(bot, pending_submissions, message.from_user.id)
-        elif exists and current_status:
+        if exists:
             pending_file_data[message.from_user.id]["awaiting_changelog"] = True
             ver_info = f" (<code>{html.escape(str(current_version))}</code> → <b>{html.escape(str(new_version))}</b>)" if current_version else ""
             prompt = await message.reply(
@@ -449,6 +448,8 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
                 f"Отправь текст ченжлога следующим сообщением ({_changelog_length_hint()}) — без него заявка в группу не уйдёт.",
             )
             pending_file_data[message.from_user.id]["changelog_prompt_msg_id"] = prompt.message_id
+        elif is_group:
+            await _send_to_group(bot, pending_submissions, message.from_user.id)
         else:
             await message.reply(
                 f"{EMOJI_PACKAGE} <b>Плагин:</b> <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
@@ -482,12 +483,12 @@ async def _finish_changelog_step(bot: Bot, pending_submissions: dict, user_id: i
 
 
 def _awaiting_changelog(message: Message) -> bool:
-    if message.chat.type != "private" or not message.from_user or not message.text:
+    if not message.from_user or not message.text:
         return False
     if message.text.startswith("/"):
         return False
     data = pending_file_data.get(message.from_user.id)
-    return bool(data and data.get("awaiting_changelog"))
+    return bool(data and data.get("awaiting_changelog") and data.get("chat_id") == message.chat.id)
 
 
 @router.message(_awaiting_changelog)
