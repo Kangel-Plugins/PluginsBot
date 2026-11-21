@@ -272,6 +272,13 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
     if not message.document or not message.from_user:
         return
 
+    is_private = message.chat.type == "private"
+    is_group = message.chat.id == GROUP_ID
+    is_updates = message.chat.id == UPDATES_CHAT_ID
+
+    if is_updates or (not is_private and is_group and not plugin_extension(message.document.file_name or "")):
+        return
+
     if message.animation:
         return
 
@@ -282,10 +289,6 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
     ext = plugin_extension(filename)
     if not ext:
         return
-
-    is_private = message.chat.type == "private"
-    is_group = message.chat.id == GROUP_ID
-    is_updates = message.chat.id == UPDATES_CHAT_ID
 
     if is_updates:
         return
@@ -414,7 +417,7 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
             "is_elyx": is_elyx,
             "metadata": metadata,
             "dependencies": dependencies,
-            "submission_id": message.message_id,
+            "submission_id": message.from_user.id * 1_000_000_000 + message.message_id,
             "exists": exists,
             "old_version": current_version if exists else None,
             "status": current_status if exists else None,
@@ -525,3 +528,9 @@ async def handle_skip_changelog(call: CallbackQuery, bot: Bot, pending_submissio
         await call.answer("✅ Заявка отправлена без ченжлога")
     else:
         await call.answer("❌ Заявка не найдена", show_alert=True)
+
+
+@router.message(F.animation)
+async def ignore_group_animation(message: Message):
+    if message.chat.id == GROUP_ID:
+        return

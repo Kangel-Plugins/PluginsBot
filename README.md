@@ -65,6 +65,28 @@ uv run bot --demo
 > bot --demo
 > ```
 
+## Автозапуск через systemd
+
+В репозитории лежит готовый юнит `PluginsBot.service`. Установка:
+
+```bash
+sudo cp PluginsBot.example.service /etc/systemd/system/PluginsBot.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now PluginsBot
+```
+
+Полезное:
+
+```bash
+journalctl -u PluginsBot -f        # живые логи
+sudo systemctl restart PluginsBot  # рестарт после git pull (зависимости пересоберутся сами)
+sudo systemctl status PluginsBot   # статус
+```
+
+> Перед каждым запуском `ExecStartPre` делает `uv sync --upgrade` — пакеты
+> ставятся/обновляются до свежих версий, затем стартует бот. После `git pull`
+> достаточно перезапустить службу.
+
 ## Автобэкап ключей и данных
 
 Раз в сутки бот сам присылает **создателю** (`BACKUP_CHAT_ID`) архив с ключами и данными:
