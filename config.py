@@ -106,6 +106,12 @@ API_HASH = os.getenv("API_HASH") or os.getenv("TELEGRAM_API_HASH") or ""
 FILE_TRANSFER_CHAT_ID = int(os.getenv("FILE_TRANSFER_CHAT_ID") or os.getenv("TRANSFER_CHAT_ID") or str(GROUP_ID))
 BOT_SESSIONS_DIR = os.getenv("BOT_SESSIONS_DIR", str(Path(__file__).parent / "data" / "bot_sessions"))
 
+AI_SUMMARY_API_URL = os.getenv("AI_SUMMARY_API_URL", "https://text.pollinations.ai/openai").strip()
+AI_SUMMARY_API_KEY = os.getenv("AI_SUMMARY_API_KEY", "").strip()
+AI_SUMMARY_MODEL = os.getenv("AI_SUMMARY_MODEL", "openai").strip()
+AI_SUMMARY_TIMEOUT = float(os.getenv("AI_SUMMARY_TIMEOUT") or 60)
+AI_SUMMARY_MIN_INTERVAL = float(os.getenv("AI_SUMMARY_MIN_INTERVAL") or 46)
+
 PLUGIN_LIMIT = 8 * 1024 * 1024
 ELYX_LIMIT = 100 * 1024 * 1024
 BOT_DOWNLOAD_BYTES = 20 * 1024 * 1024

@@ -25,6 +25,7 @@ from PluginsBot.utils.download_utils import (
     plugin_extension,
 )
 from PluginsBot.utils.store_utils import is_plugin_in_store, get_plugin_entry, compare_versions
+from PluginsBot.utils.ai_summary import ai_summary_enabled, summarize_changelog
 from PluginsBot.utils.emoji_utils import (
     make_inline_button,
     check_and_update_from_message,
@@ -50,6 +51,37 @@ from PluginsBot.utils.emoji_utils import (
 router = Router()
 
 pending_file_data = {}
+
+CAPTION_LIMIT = 1024
+CHANGELOG_MIN_LEN = 40
+CHANGELOG_SUMMARY_LIMIT = 400
+CHANGELOG_KEEP_LIMIT = 450
+CHANGELOG_MAX_LEN = 4000
+CHANGELOG_PLACEHOLDERS = {"нет", "skip", "пропустить", "no", "none"}
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _visible_len(markup: str) -> int:
+    return len(html.unescape(_TAG_RE.sub("", markup)).encode("utf-16-le")) // 2
+
+
+def changelog_caption_block(changelog, rest_of_caption: str) -> str:
+    text = str(changelog or "").strip()
+    if not text:
+        return ""
+    budget = CAPTION_LIMIT - _visible_len(rest_of_caption) - 80
+    if budget < 40:
+        return ""
+    if len(text) > budget:
+        text = text[:budget - 3] + "..."
+    return f"{EMOJI_MEMO} Что нового:\n<blockquote expandable>{html.escape(text)}</blockquote>\n"
+
+
+def _changelog_length_hint() -> str:
+    hint = f"от {CHANGELOG_MIN_LEN} до {CHANGELOG_KEEP_LIMIT} символов"
+    if ai_summary_enabled():
+        hint += ", более длинный текст бот сократит сам"
+    return hint
 
 
 def create_approval_keyboard(submission_id: int, needs_status: bool = False) -> InlineKeyboardMarkup:
@@ -134,8 +166,9 @@ async def _send_to_group(bot: Bot, pending_submissions: dict, user_id: int):
     description = metadata.get('description')
     if description and str(description).strip():
         desc_str = str(description).replace("\\n", "\n").strip()
-        if len(desc_str) > 600:
-            desc_str = desc_str[:597] + "..."
+        desc_limit = 250 if data.get("changelog_plain") else 600
+        if len(desc_str) > desc_limit:
+            desc_str = desc_str[:desc_limit - 3] + "..."
         info_text += f"{EMOJI_FILE} Описание:\n<blockquote expandable>{html.escape(desc_str)}</blockquote>\n"
 
     requirements = metadata.get('requirements')
@@ -159,7 +192,9 @@ async def _send_to_group(bot: Bot, pending_submissions: dict, user_id: int):
             req_texts.append(html.escape(rlabel))
         info_text += f"{EMOJI_LINK} Требует: {', '.join(req_texts)}\n"
 
-    info_text += f"\n{EMOJI_FILE} Файл: <code>{html.escape(data.get('plugin_file', 'N/A'))}</code>"
+    file_line = f"\n{EMOJI_FILE} Файл: <code>{html.escape(data.get('plugin_file', 'N/A'))}</code>"
+    info_text += changelog_caption_block(data.get("changelog_plain"), info_text + file_line)
+    info_text += file_line
 
     pending_submissions[submission_id]["caption_html"] = info_text
 
@@ -398,18 +433,22 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
             "exists": exists,
             "old_version": current_version if exists else None,
             "status": current_status if exists else None,
+            "changelog": None,
         }
 
         pending_file_data[message.from_user.id] = submission_data
 
-        if is_group or (exists and current_status):
+        if is_group:
             await _send_to_group(bot, pending_submissions, message.from_user.id)
-            if is_private and current_status:
-                ver_info = f" (<code>{html.escape(str(current_version))}</code> → <b>{html.escape(str(new_version))}</b>)" if current_version else ""
-                await message.reply(
-                    f"{EMOJI_CHECK} Плагин обновлён!{ver_info} Категория: <b>{get_category_label(current_status)}</b>\n"
-                    f"Заявка отправлена в группу на рассмотрение.",
-                )
+        elif exists and current_status:
+            pending_file_data[message.from_user.id]["awaiting_changelog"] = True
+            ver_info = f" (<code>{html.escape(str(current_version))}</code> → <b>{html.escape(str(new_version))}</b>)" if current_version else ""
+            prompt = await message.reply(
+                f"{EMOJI_CHECK} Плагин обновлён!{ver_info}\n\n"
+                f"{EMOJI_MEMO} <b>Что нового в этой версии?</b>\n"
+                f"Отправь текст ченжлога следующим сообщением ({_changelog_length_hint()}) — без него заявка в группу не уйдёт.",
+            )
+            pending_file_data[message.from_user.id]["changelog_prompt_msg_id"] = prompt.message_id
         else:
             await message.reply(
                 f"{EMOJI_PACKAGE} <b>Плагин:</b> <code>{html.escape(str(metadata.get('id', 'N/A')))}</code>\n"
@@ -423,6 +462,90 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
     except Exception as e:
         print(f"Ошибка при обработке плагина: {e}")
         await message.reply(f"{EMOJI_CROSS} Ошибка при обработке файла: {html.escape(str(e))}")
+
+
+async def _finish_changelog_step(bot: Bot, pending_submissions: dict, user_id: int, changelog, chat_id: int, plain=None) -> bool:
+    data = pending_file_data.get(user_id)
+    if not data:
+        return False
+    data["changelog"] = changelog
+    data["changelog_plain"] = plain
+    data["awaiting_changelog"] = False
+    prompt_id = data.get("changelog_prompt_msg_id")
+    await _send_to_group(bot, pending_submissions, user_id)
+    if prompt_id:
+        try:
+            await bot.delete_message(chat_id, prompt_id)
+        except Exception:
+            pass
+    return True
+
+
+def _awaiting_changelog(message: Message) -> bool:
+    if message.chat.type != "private" or not message.from_user or not message.text:
+        return False
+    if message.text.startswith("/"):
+        return False
+    data = pending_file_data.get(message.from_user.id)
+    return bool(data and data.get("awaiting_changelog"))
+
+
+@router.message(_awaiting_changelog)
+async def handle_changelog_input(message: Message, bot: Bot, pending_submissions: dict):
+    user_id = message.from_user.id
+    text = (message.text or "").strip()
+    if len(text) > CHANGELOG_MAX_LEN:
+        await message.reply(
+            f"{EMOJI_CROSS} Слишком длинно: {len(text)} симв. Уложись в {CHANGELOG_MAX_LEN} и отправь ещё раз."
+        )
+        return
+    if not any(ch.isalnum() for ch in text) or text.lower() in CHANGELOG_PLACEHOLDERS:
+        await message.reply(f"{EMOJI_CROSS} Это не ченжлог. Напиши, что изменилось в этой версии.")
+        return
+    if len(text) < CHANGELOG_MIN_LEN:
+        await message.reply(
+            f"{EMOJI_CROSS} Слишком коротко: {len(text)} симв., нужно минимум {CHANGELOG_MIN_LEN}. Распиши подробнее, что изменилось."
+        )
+        return
+    changelog = (message.html_text or text).strip()
+    plain = text
+    summary_note = ""
+    if len(text) > CHANGELOG_KEEP_LIMIT:
+        if not ai_summary_enabled():
+            await message.reply(
+                f"{EMOJI_CROSS} Слишком длинно: {len(text)} симв. Уложись в {CHANGELOG_KEEP_LIMIT} и отправь ещё раз."
+            )
+            return
+        data = pending_file_data.get(user_id)
+        if not data:
+            return
+        data["awaiting_changelog"] = False
+        wait_msg = None
+        try:
+            wait_msg = await message.reply(f"{EMOJI_MEMO} Сокращаю ченжлог, это может занять пару минут…")
+        except Exception:
+            pass
+        summary = await summarize_changelog(text, CHANGELOG_SUMMARY_LIMIT)
+        if wait_msg:
+            try:
+                await wait_msg.delete()
+            except Exception:
+                pass
+        if not summary or len(summary) < CHANGELOG_MIN_LEN:
+            data["awaiting_changelog"] = True
+            await message.reply(
+                f"{EMOJI_CROSS} Не получилось сократить ченжлог автоматически ({len(text)} симв.). "
+                f"Уложись в {CHANGELOG_KEEP_LIMIT} и отправь ещё раз."
+            )
+            return
+        plain = summary
+        changelog = html.escape(summary)
+        summary_note = (
+            f"{EMOJI_MEMO} Ченжлог сокращён до {len(summary)} симв.:\n"
+            f"<blockquote expandable>{changelog}</blockquote>\n"
+        )
+    if await _finish_changelog_step(bot, pending_submissions, user_id, changelog, message.chat.id, plain):
+        await message.reply(f"{summary_note}{EMOJI_CHECK} Заявка отправлена в группу на рассмотрение.")
 
 
 @router.message(F.animation)

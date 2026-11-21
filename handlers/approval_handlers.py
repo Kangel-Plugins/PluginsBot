@@ -133,6 +133,9 @@ def _move_old_version_to_legacy(plugin_id: str, old_filename: str) -> bool:
         }
         if legacy_signature:
             legacy_entry["signature"] = legacy_signature
+        old_changelog = entry.get("changelog")
+        if old_changelog:
+            legacy_entry["changelog"] = old_changelog
         entry["legacy_version"][version] = legacy_entry
 
         with open(STORE_JSON_FILE, "w", encoding="utf-8") as f:
@@ -216,8 +219,9 @@ async def handle_approve(call: CallbackQuery, bot: Bot, pending_submissions: dic
 
         url = f"{STORE_RAW_URL}/Plugins/{plugin_filename}"
         status = submission.get("status", "plugin")
+        changelog = submission.get("changelog")
 
-        if not add_plugin_to_store_json(plugin_id, url, dependencies, plugin_filename, status=status):
+        if not add_plugin_to_store_json(plugin_id, url, dependencies, plugin_filename, status=status, changelog=changelog):
             error_msg = f"❌ Ошибка при добавлении {plugin_id} в store.json (смотри консоль)"
             print(f"[APPROVE] {error_msg}")
             await call.answer(error_msg, show_alert=True)
@@ -262,6 +266,7 @@ async def handle_approve(call: CallbackQuery, bot: Bot, pending_submissions: dic
             is_new_plugin,
             status=status,
             description=metadata.get('description'),
+            changelog=submission.get("changelog_plain"),
         )
 
         if commit_message:
@@ -576,8 +581,9 @@ def _build_submission_caption(metadata, submission):
     description = metadata.get('description')
     if description and str(description).strip():
         desc_str = str(description).replace("\\n", "\n").strip()
-        if len(desc_str) > 600:
-            desc_str = desc_str[:597] + "..."
+        desc_limit = 250 if submission.get("changelog_plain") else 600
+        if len(desc_str) > desc_limit:
+            desc_str = desc_str[:desc_limit - 3] + "..."
         info_text += f"{EMOJI_FILE} Описание:\n<blockquote expandable>{html.escape(desc_str)}</blockquote>\n"
 
     requirements = metadata.get('requirements')
@@ -601,5 +607,9 @@ def _build_submission_caption(metadata, submission):
             req_texts.append(html.escape(rlabel))
         info_text += f"{EMOJI_LINK} Требует: {', '.join(req_texts)}\n"
 
-    info_text += f"\n{EMOJI_FILE} Файл: <code>{html.escape(submission.get('plugin_file', 'N/A'))}</code>"
+    from PluginsBot.handlers.plugin_handlers import changelog_caption_block
+
+    file_line = f"\n{EMOJI_FILE} Файл: <code>{html.escape(submission.get('plugin_file', 'N/A'))}</code>"
+    info_text += changelog_caption_block(submission.get("changelog_plain"), info_text + file_line)
+    info_text += file_line
     return info_text
