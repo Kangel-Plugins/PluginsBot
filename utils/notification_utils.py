@@ -29,6 +29,7 @@ async def send_plugin_update_notification(
     is_new: bool,
     status: str = "plugin",
     description: str | None = None,
+    changelog: str | None = None,
 ):
     try:
         action = f"{EMOJI_PLUS} <b>Новый плагин</b>" if is_new else f"{EMOJI_REFRESH} <b>Обновление плагина</b>"
@@ -45,10 +46,18 @@ async def send_plugin_update_notification(
             f"{EMOJI_FOLDER} <b>Тип:</b> {type_label}"
         )
 
+        has_changelog = bool(not is_new and changelog and str(changelog).strip())
+        if has_changelog:
+            cl_clean = str(changelog).strip()
+            if len(cl_clean) > 900:
+                cl_clean = cl_clean[:897] + "..."
+            notification_text += f"\n\n{EMOJI_MEMO} <b>Что нового:</b>\n<blockquote expandable>{html.escape(cl_clean)}</blockquote>"
+
         if description and str(description).strip():
             desc_clean = str(description).replace("\\n", "\n").strip()
-            if len(desc_clean) > 3000:
-                desc_clean = desc_clean[:2997] + "..."
+            desc_limit = 2000 if has_changelog else 3000
+            if len(desc_clean) > desc_limit:
+                desc_clean = desc_clean[:desc_limit - 3] + "..."
             notification_text += f"\n\n<blockquote expandable>{html.escape(desc_clean)}</blockquote>"
 
         keyboard = InlineKeyboardMarkup(

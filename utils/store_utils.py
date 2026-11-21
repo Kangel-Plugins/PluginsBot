@@ -387,7 +387,7 @@ def get_plugin_filename_by_id(plugin_id: str) -> Optional[str]:
     return filename or None
 
 
-def add_plugin_to_store_json(plugin_id: str, url: str, dependencies: List[str] = None, plugin_filename: str = None, status: str = None, signature: str = None) -> bool:
+def add_plugin_to_store_json(plugin_id: str, url: str, dependencies: List[str] = None, plugin_filename: str = None, status: str = None, signature: str = None, changelog: Optional[str] = None) -> bool:
 
     try:
         if os.path.exists(STORE_JSON_FILE):
@@ -421,6 +421,8 @@ def add_plugin_to_store_json(plugin_id: str, url: str, dependencies: List[str] =
             plugin_entry["name"] = name
         if version:
             plugin_entry["version"] = version
+        if changelog:
+            plugin_entry["changelog"] = changelog
         if min_version:
             plugin_entry["min_version"] = min_version
         if app_version:
