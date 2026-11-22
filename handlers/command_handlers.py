@@ -99,7 +99,7 @@ async def handle_start(message: Message):
             f"• <code>__version__</code> = <code>\"1.0.0\"</code>\n"
             f"• <code>__author__</code> = <code>\"@username\"</code>\n"
             f"• <code>__description__</code> = <code>\"Описание плагина\"</code>\n"
-            f"• <code>__app_version__</code> = <code>\"&gt;=12.5.1\"</code>\n"
+            f"• <code>__app_version__</code> = <code>&gt;=12.5.1</code>\n"
             f"• <code>__requirements__</code> = <code>\"requests, PyYAML\"</code> (опционально)\n\n"
             f"Зависимости и метаданные определяются автоматически.",
             reply_markup=reply_markup,

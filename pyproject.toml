@@ -5,7 +5,7 @@ description = "Telegram moderation bot for KPM Store"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "aiogram>=3.14.0",
+    "aiogram>=3.14.0,<3.33",
     "python-dotenv>=1.0.0",
     "cryptography>=43.0.0",
     "telethon",

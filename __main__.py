@@ -49,7 +49,7 @@ async def main():
     print(f"📁 Репозиторий: {REPO_PATH}")
     print(f"👥 Группа для заявок: {GROUP_ID}")
 
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 
 
 def run():
