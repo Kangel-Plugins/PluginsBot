@@ -115,3 +115,7 @@ AI_SUMMARY_MIN_INTERVAL = float(os.getenv("AI_SUMMARY_MIN_INTERVAL") or 46)
 PLUGIN_LIMIT = 8 * 1024 * 1024
 ELYX_LIMIT = 100 * 1024 * 1024
 BOT_DOWNLOAD_BYTES = 20 * 1024 * 1024
+
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "3600"))
+SUBMISSION_RATE_LIMIT = int(os.getenv("SUBMISSION_RATE_LIMIT", "3"))
+RATE_LIMITS_FILE = os.getenv("RATE_LIMITS_FILE", str(Path(__file__).parent / "data" / "rate_limits.json"))

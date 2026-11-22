@@ -26,6 +26,20 @@ from PluginsBot.utils.download_utils import (
 )
 from PluginsBot.utils.store_utils import is_plugin_in_store, get_plugin_entry, compare_versions
 from PluginsBot.utils.ai_summary import ai_summary_enabled, summarize_changelog
+try:
+    from PluginsBot.utils.rate_limit import (
+        is_review_group_admin,
+        check_rate_limit,
+        record_submission,
+        format_rate_limit_error,
+    )
+except ImportError:
+    from utils.rate_limit import (
+        is_review_group_admin,
+        check_rate_limit,
+        record_submission,
+        format_rate_limit_error,
+    )
 from PluginsBot.utils.emoji_utils import (
     make_inline_button,
     check_and_update_from_message,
@@ -126,6 +140,28 @@ def create_approval_keyboard(submission_id: int, needs_status: bool = False) -> 
 async def _send_to_group(bot: Bot, pending_submissions: dict, user_id: int):
     if user_id not in pending_file_data:
         return
+
+    data = pending_file_data.get(user_id)
+    if not data:
+        return
+
+    if not await is_review_group_admin(bot, user_id):
+        is_limited, user_limit, retry_after, _ = await check_rate_limit(
+            bot, user_id
+        )
+        if is_limited:
+            pending_file_data.pop(user_id, None)
+            temp_path = data.get("temp_path")
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
+            try:
+                await bot.send_message(user_id, format_rate_limit_error(user_limit, retry_after))
+            except Exception:
+                pass
+            return
 
     data = pending_file_data.pop(user_id)
     category = data.get("status")
@@ -229,6 +265,9 @@ async def _send_to_group(bot: Bot, pending_submissions: dict, user_id: int):
     check_and_update_from_message(group_message)
     pending_submissions[submission_id]["group_message_id"] = group_message.message_id
 
+    if not await is_review_group_admin(bot, user_id):
+        record_submission(user_id)
+
 
 @router.callback_query(F.data.startswith("status_"))
 async def handle_status_selection(call: CallbackQuery, pending_submissions: dict):
@@ -325,6 +364,15 @@ async def handle_plugin_submission(message: Message, bot: Bot, pending_submissio
                 f"{EMOJI_CROSS} Для отправки плагинов необходимо зайти в @KangelPluginsManager"
             )
             return
+
+        is_admin = await is_review_group_admin(bot, message.from_user.id)
+        if not is_admin:
+            is_limited, user_limit, retry_after, _ = await check_rate_limit(
+                bot, message.from_user.id
+            )
+            if is_limited:
+                await message.reply(format_rate_limit_error(user_limit, retry_after))
+                return
 
     try:
         downloaded_file = await download_plugin_file(bot, message.document)
