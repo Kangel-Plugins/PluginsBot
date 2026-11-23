@@ -164,6 +164,10 @@ async def handle_approve(call: CallbackQuery, bot: Bot, pending_submissions: dic
         return
 
     submission = pending_submissions[submission_id]
+    if not submission.get("status") or submission.get("status") == "plugin":
+        await call.answer("❌ Сначала выберите категорию плагина", show_alert=True)
+        return
+
     metadata = submission["metadata"]
     plugin_id = metadata.get("id")
     dependencies = submission["dependencies"]
@@ -218,7 +222,10 @@ async def handle_approve(call: CallbackQuery, bot: Bot, pending_submissions: dic
                     f.write(content)
 
         url = f"{STORE_RAW_URL}/Plugins/{plugin_filename}"
-        status = submission.get("status", "plugin")
+        status = submission.get("status")
+        if not status or status == "plugin":
+            await call.answer("❌ Сначала выберите категорию плагина", show_alert=True)
+            return
         changelog = submission.get("changelog")
 
         if not add_plugin_to_store_json(plugin_id, url, dependencies, plugin_filename, status=status, changelog=changelog):

@@ -99,24 +99,7 @@ def _changelog_length_hint() -> str:
 
 
 def create_approval_keyboard(submission_id: int, needs_status: bool = False) -> InlineKeyboardMarkup:
-    rows = [
-        [
-            make_inline_button(
-                "Принять",
-                callback_data=f"approve_{submission_id}",
-                emoji_id=ID_CHECK,
-                fallback_emoji="✅",
-                style="success",
-            ),
-            make_inline_button(
-                "Отклонить",
-                callback_data=f"reject_{submission_id}",
-                emoji_id=ID_CROSS,
-                fallback_emoji="❌",
-                style="danger",
-            ),
-        ]
-    ]
+    rows = []
 
     if needs_status:
         current_row = []
@@ -133,6 +116,23 @@ def create_approval_keyboard(submission_id: int, needs_status: bool = False) -> 
                 current_row = []
         if current_row:
             rows.append(current_row)
+
+    rows.append([
+        make_inline_button(
+            "Принять",
+            callback_data=f"approve_{submission_id}",
+            emoji_id=ID_CHECK,
+            fallback_emoji="✅",
+            style="success",
+        ),
+        make_inline_button(
+            "Отклонить",
+            callback_data=f"reject_{submission_id}",
+            emoji_id=ID_CROSS,
+            fallback_emoji="❌",
+            style="danger",
+        ),
+    ])
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
